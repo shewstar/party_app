@@ -91,3 +91,15 @@ export type SpinRow = {
   created_at: string;
 };
 
+export type FilterVariant = "warm" | "cool";
+
+export type CameraPhotoRow = {
+  id: string;
+  user_id: string;
+  storage_path: string;
+  photo_url: string;
+  party_day: string;
+  filter_variant: FilterVariant;
+  taken_at: string;
+};
+

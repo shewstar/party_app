@@ -11,7 +11,10 @@ import DisclaimerFooter from "@/components/DisclaimerFooter";
 import { supabase } from "@/lib/supabase/browser";
 import { estimateBAC } from "@/lib/bac";
 import { useUser } from "@/lib/user-context";
+import { partyDayKey } from "@/lib/recap";
 import type { DrinkRow, DrinksLeaderboardRow, VoteTallyRow } from "@/lib/supabase/types";
+
+const CAMERA_DAILY_LIMIT = 3;
 
 export default function HomePage() {
   const { user, loading } = useUser();
@@ -19,15 +22,18 @@ export default function HomePage() {
   const [board, setBoard] = useState<DrinksLeaderboardRow[]>([]);
   const [forItems, setForItems] = useState<VoteTallyRow[]>([]);
   const [newVoteCount, setNewVoteCount] = useState(0);
+  const [cameraUsed, setCameraUsed] = useState(0);
 
   async function loadAll(uid?: string) {
     const s = supabase();
+    const todayKey = partyDayKey(Date.now());
     const [
       { data: drinks },
       { data: lb },
       { data: tally },
       { data: voteIds },
       { data: myResponses },
+      cameraCount,
     ] = await Promise.all([
       uid
         ? s.from("drink_entries").select("*").eq("user_id", uid).order("logged_at", { ascending: false })
@@ -38,6 +44,13 @@ export default function HomePage() {
       uid
         ? s.from("vote_responses").select("vote_item_id").eq("user_id", uid)
         : Promise.resolve({ data: [] as { vote_item_id: string }[] }),
+      uid
+        ? s
+            .from("camera_photos")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", uid)
+            .eq("party_day", todayKey)
+        : Promise.resolve({ count: 0 as number | null }),
     ]);
     setMyDrinks((drinks ?? []) as DrinkRow[]);
     setBoard((lb ?? []) as DrinksLeaderboardRow[]);
@@ -47,6 +60,7 @@ export default function HomePage() {
     );
     const unvoted = ((voteIds ?? []) as { id: string }[]).filter((v) => !voted.has(v.id)).length;
     setNewVoteCount(unvoted);
+    setCameraUsed(cameraCount.count ?? 0);
   }
 
   useEffect(() => {
@@ -65,6 +79,9 @@ export default function HomePage() {
         loadAll(user?.id),
       )
       .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () =>
+        loadAll(user?.id),
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "camera_photos" }, () =>
         loadAll(user?.id),
       )
       .subscribe();
@@ -126,6 +143,17 @@ export default function HomePage() {
         <Tile href="/vote" icon="🗳️" label="Vote" sub="Propose rules" badge={newVoteCount} />
         <Tile href="/settings" icon="⚙️" label="Settings" sub="You & BAC" />
         <Tile href="/spin" icon="🎡" label="Spin" sub="Pick someone" className="col-span-2" />
+        <Tile
+          href="/camera"
+          icon="📷"
+          label="Camera"
+          sub={
+            cameraUsed >= CAMERA_DAILY_LIMIT
+              ? "No film left — develops at 5am"
+              : `${CAMERA_DAILY_LIMIT - cameraUsed} shot${CAMERA_DAILY_LIMIT - cameraUsed === 1 ? "" : "s"} left today`
+          }
+          className="col-span-2"
+        />
         <Tile href="/recap" icon="🏁" label="Recap" sub="End-of-night stats" className="col-span-2" />
       </div>
 
