@@ -67,9 +67,18 @@ export default function AddDrinkPage() {
     const isCustom = presetId === "custom";
     if (isCustom) {
       volume_ml = Number(customVol);
-      abv = Number(customAbv) / 100;
+      const abvPct = Number(customAbv);
+      abv = abvPct / 100;
       label = `Custom — ${volume_ml}ml @ ${customAbv}%`;
-      if (!volume_ml || !abv || isNaN(volume_ml) || isNaN(abv)) return;
+      if (
+        isNaN(volume_ml) ||
+        isNaN(abvPct) ||
+        volume_ml <= 0 ||
+        volume_ml > 2000 ||
+        abvPct < 0.1 ||
+        abvPct > 95
+      )
+        return;
     } else {
       const preset = presetId?.startsWith("saved:")
         ? savedPresets.find((p) => p.id === presetId)
@@ -141,7 +150,10 @@ export default function AddDrinkPage() {
   const canSubmit =
     presetId &&
     (presetId !== "custom" ||
-      (Number(customVol) > 0 && Number(customAbv) > 0));
+      (Number(customVol) > 0 &&
+        Number(customVol) <= 2000 &&
+        Number(customAbv) >= 0.1 &&
+        Number(customAbv) <= 95));
 
   return (
     <main className="flex-1 flex flex-col">
@@ -172,6 +184,9 @@ export default function AddDrinkPage() {
                   <input
                     type="number"
                     inputMode="decimal"
+                  min={1}
+                  max={2000}
+                  step="any"
                     value={customVol}
                     onChange={(e) => setCustomVol(e.target.value)}
                     className="border border-line rounded-card px-3 py-2 bg-surface"
@@ -182,6 +197,9 @@ export default function AddDrinkPage() {
                   <input
                     type="number"
                     inputMode="decimal"
+                  min={0.1}
+                  max={95}
+                  step="any"
                     value={customAbv}
                     onChange={(e) => setCustomAbv(e.target.value)}
                     className="border border-line rounded-card px-3 py-2 bg-surface"
