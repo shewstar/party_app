@@ -32,7 +32,7 @@ export default function Tile({
       <span className="font-semibold text-base">{label}</span>
       {sub && <span className="text-sm text-muted">{sub}</span>}
       {badge !== undefined && badge > 0 && (
-        <span className="absolute top-2 right-2 min-w-[20px] h-5 px-1.5 rounded-full bg-accent text-white text-xs font-semibold flex items-center justify-center tabular-nums">
+        <span className="absolute -top-2 -right-2 min-w-[28px] h-7 px-2 rounded-full bg-danger text-white text-sm font-bold flex items-center justify-center tabular-nums shadow-card ring-2 ring-white">
           {badge > 99 ? "99+" : badge}
         </span>
       )}
