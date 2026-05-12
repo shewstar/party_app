@@ -37,6 +37,15 @@ function arcPath(startDeg: number, endDeg: number, radius: number) {
   return `M 0 0 L ${start.x.toFixed(3)} ${start.y.toFixed(3)} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x.toFixed(3)} ${end.y.toFixed(3)} Z`;
 }
 
+function initialsOf(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
 export default function SpinPage() {
   const { user, loading } = useUser();
   const [members, setMembers] = useState<UserRow[]>([]);
@@ -129,7 +138,8 @@ export default function SpinPage() {
   }
 
   const n = pool.length;
-  const labelFontSize = n > 10 ? 13 : n > 6 ? 16 : 19;
+  const labelFontSize = n > 10 ? 11 : n > 6 ? 13 : 15;
+  const avatarR = n > 10 ? 16 : n > 6 ? 22 : 28;
 
   return (
     <main className="flex-1 flex flex-col">
@@ -199,9 +209,35 @@ export default function SpinPage() {
                       stroke="#fff"
                       strokeWidth={2}
                     />
+                    {pool[0].avatar_url ? (
+                      <>
+                        <defs>
+                          <clipPath id={`avclip-${pool[0].id}`}>
+                            <circle cx={0} cy={-30} r={46} />
+                          </clipPath>
+                        </defs>
+                        <image
+                          href={pool[0].avatar_url}
+                          x={-46}
+                          y={-76}
+                          width={92}
+                          height={92}
+                          clipPath={`url(#avclip-${pool[0].id})`}
+                          preserveAspectRatio="xMidYMid slice"
+                        />
+                        <circle
+                          cx={0}
+                          cy={-30}
+                          r={46}
+                          fill="none"
+                          stroke="white"
+                          strokeWidth={2}
+                        />
+                      </>
+                    ) : null}
                     <text
                       x={0}
-                      y={0}
+                      y={pool[0].avatar_url ? 38 : 0}
                       fill="white"
                       fontSize={22}
                       fontWeight={600}
@@ -217,7 +253,8 @@ export default function SpinPage() {
                     const start = (i / n) * 360;
                     const end = ((i + 1) / n) * 360;
                     const mid = (start + end) / 2;
-                    const labelPos = polar(mid, R * 0.62);
+                    const avatarPos = polar(mid, R * 0.55);
+                    const labelPos = polar(mid, R * 0.85);
                     return (
                       <g key={m.id}>
                         <path
@@ -226,6 +263,58 @@ export default function SpinPage() {
                           stroke="#fff"
                           strokeWidth={2}
                         />
+                        {m.avatar_url ? (
+                          <>
+                            <defs>
+                              <clipPath id={`avclip-${m.id}`}>
+                                <circle
+                                  cx={avatarPos.x}
+                                  cy={avatarPos.y}
+                                  r={avatarR}
+                                />
+                              </clipPath>
+                            </defs>
+                            <image
+                              href={m.avatar_url}
+                              x={avatarPos.x - avatarR}
+                              y={avatarPos.y - avatarR}
+                              width={avatarR * 2}
+                              height={avatarR * 2}
+                              clipPath={`url(#avclip-${m.id})`}
+                              preserveAspectRatio="xMidYMid slice"
+                            />
+                            <circle
+                              cx={avatarPos.x}
+                              cy={avatarPos.y}
+                              r={avatarR}
+                              fill="none"
+                              stroke="white"
+                              strokeWidth={1.5}
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <circle
+                              cx={avatarPos.x}
+                              cy={avatarPos.y}
+                              r={avatarR}
+                              fill="rgba(255,255,255,0.22)"
+                              stroke="white"
+                              strokeWidth={1.5}
+                            />
+                            <text
+                              x={avatarPos.x}
+                              y={avatarPos.y}
+                              fill="white"
+                              fontSize={avatarR * 0.85}
+                              fontWeight={700}
+                              textAnchor="middle"
+                              dominantBaseline="central"
+                            >
+                              {initialsOf(m.name) || "?"}
+                            </text>
+                          </>
+                        )}
                         <text
                           x={labelPos.x}
                           y={labelPos.y}
