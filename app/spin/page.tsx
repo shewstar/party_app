@@ -138,8 +138,8 @@ export default function SpinPage() {
   }
 
   const n = pool.length;
-  const labelFontSize = n > 10 ? 11 : n > 6 ? 13 : 15;
-  const avatarR = n > 10 ? 16 : n > 6 ? 22 : 28;
+  const labelFontSize = n > 10 ? 10 : n > 6 ? 12 : 14;
+  const avatarR = n > 10 ? 24 : n > 6 ? 36 : 50;
 
   return (
     <main className="flex-1 flex flex-col">
@@ -253,8 +253,8 @@ export default function SpinPage() {
                     const start = (i / n) * 360;
                     const end = ((i + 1) / n) * 360;
                     const mid = (start + end) / 2;
-                    const avatarPos = polar(mid, R * 0.55);
-                    const labelPos = polar(mid, R * 0.85);
+                    const avatarPos = polar(mid, R * 0.5);
+                    const labelPos = polar(mid, R * 0.91);
                     return (
                       <g key={m.id}>
                         <path
