@@ -20,6 +20,7 @@ export type DrinkRow = {
   abv: number;
   standard_drinks: number;
   logged_at: string;
+  is_saved_preset: boolean;
 };
 
 export type VoteItemRow = {

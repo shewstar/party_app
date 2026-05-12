@@ -1,4 +1,4 @@
-import type { DrinkCategory } from "./supabase/types";
+import type { DrinkCategory, DrinkRow } from "./supabase/types";
 
 export type Preset = {
   id: string;
@@ -43,4 +43,25 @@ export function standardDrinks(volume_ml: number, abv: number): number {
 
 export function categoryEmoji(c: DrinkCategory): string {
   return c === "beer" ? "🍺" : c === "wine" ? "🍷" : "🥃";
+}
+
+export function savedPresetsFromEntries(
+  rows: Pick<DrinkRow, "id" | "category" | "label" | "volume_ml" | "abv">[],
+  category: DrinkCategory,
+): Preset[] {
+  const seen = new Set<string>();
+  const out: Preset[] = [];
+  for (const r of rows) {
+    if (r.category !== category) continue;
+    const key = `${r.volume_ml}|${r.abv}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      id: `saved:${r.id}`,
+      label: r.label ?? `${r.volume_ml}ml @ ${(r.abv * 100).toFixed(1)}%`,
+      volume_ml: r.volume_ml,
+      abv: r.abv,
+    });
+  }
+  return out;
 }

@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
 import Card from "@/components/Card";
 import Chip from "@/components/Chip";
 import BigButton from "@/components/BigButton";
-import { PRESETS, standardDrinks, categoryEmoji } from "@/lib/drinks";
+import {
+  PRESETS,
+  standardDrinks,
+  categoryEmoji,
+  savedPresetsFromEntries,
+  type Preset,
+} from "@/lib/drinks";
 import { estimateBAC } from "@/lib/bac";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
@@ -19,7 +25,33 @@ export default function AddDrinkPage() {
   const [presetId, setPresetId] = useState<string | null>(null);
   const [customVol, setCustomVol] = useState("");
   const [customAbv, setCustomAbv] = useState("");
+  const [saveForNext, setSaveForNext] = useState(false);
+  const [savedPresets, setSavedPresets] = useState<Preset[]>([]);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (presetId !== "custom") setSaveForNext(false);
+  }, [presetId]);
+
+  useEffect(() => {
+    if (!user || !category) {
+      setSavedPresets([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase()
+        .from("drink_entries")
+        .select("id, category, label, volume_ml, abv")
+        .eq("user_id", user.id)
+        .eq("is_saved_preset", true);
+      if (cancelled) return;
+      setSavedPresets(savedPresetsFromEntries(data ?? [], category));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, category]);
 
   if (loading || !user) {
     return (
@@ -32,13 +64,16 @@ export default function AddDrinkPage() {
     let volume_ml: number;
     let abv: number;
     let label: string | null = null;
-    if (presetId === "custom") {
+    const isCustom = presetId === "custom";
+    if (isCustom) {
       volume_ml = Number(customVol);
       abv = Number(customAbv) / 100;
       label = `Custom — ${volume_ml}ml @ ${customAbv}%`;
       if (!volume_ml || !abv || isNaN(volume_ml) || isNaN(abv)) return;
     } else {
-      const preset = PRESETS[category].find((p) => p.id === presetId);
+      const preset = presetId?.startsWith("saved:")
+        ? savedPresets.find((p) => p.id === presetId)
+        : PRESETS[category].find((p) => p.id === presetId);
       if (!preset) return;
       volume_ml = preset.volume_ml;
       abv = preset.abv;
@@ -66,6 +101,7 @@ export default function AddDrinkPage() {
       volume_ml,
       abv,
       standard_drinks: sd,
+      ...(isCustom && saveForNext ? { is_saved_preset: true } : {}),
       ...(startNewSession ? { logged_at: nowIso } : {}),
     });
     if (startNewSession) {
@@ -119,33 +155,48 @@ export default function AddDrinkPage() {
                 {p.label}
               </Chip>
             ))}
+            {savedPresets.map((p) => (
+              <Chip key={p.id} active={presetId === p.id} onClick={() => setPresetId(p.id)}>
+                {p.label}
+              </Chip>
+            ))}
             <Chip active={presetId === "custom"} onClick={() => setPresetId("custom")}>
               Custom…
             </Chip>
           </div>
           {presetId === "custom" && (
-            <div className="flex gap-3 mt-4">
-              <label className="flex-1 flex flex-col gap-1">
-                <span className="text-xs text-muted">Volume (ml)</span>
+            <>
+              <div className="flex gap-3 mt-4">
+                <label className="flex-1 flex flex-col gap-1">
+                  <span className="text-xs text-muted">Volume (ml)</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={customVol}
+                    onChange={(e) => setCustomVol(e.target.value)}
+                    className="border border-line rounded-card px-3 py-2 bg-surface"
+                  />
+                </label>
+                <label className="flex-1 flex flex-col gap-1">
+                  <span className="text-xs text-muted">ABV (%)</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={customAbv}
+                    onChange={(e) => setCustomAbv(e.target.value)}
+                    className="border border-line rounded-card px-3 py-2 bg-surface"
+                  />
+                </label>
+              </div>
+              <label className="flex items-center gap-2 mt-3 text-sm">
                 <input
-                  type="number"
-                  inputMode="decimal"
-                  value={customVol}
-                  onChange={(e) => setCustomVol(e.target.value)}
-                  className="border border-line rounded-card px-3 py-2 bg-surface"
+                  type="checkbox"
+                  checked={saveForNext}
+                  onChange={(e) => setSaveForNext(e.target.checked)}
                 />
+                <span>Save for next time</span>
               </label>
-              <label className="flex-1 flex flex-col gap-1">
-                <span className="text-xs text-muted">ABV (%)</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  value={customAbv}
-                  onChange={(e) => setCustomAbv(e.target.value)}
-                  className="border border-line rounded-card px-3 py-2 bg-surface"
-                />
-              </label>
-            </div>
+            </>
           )}
         </Card>
 
