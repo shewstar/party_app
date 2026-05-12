@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  background: #f7f6f2;
+  color: #22201c;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Larger tap targets on touch devices */
+@media (hover: none) {
+  button, a {
+    min-height: 44px;
+  }
+}

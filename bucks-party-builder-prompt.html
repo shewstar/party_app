@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bucks Party App Builder Prompt</title>
+  <style>
+    :root {
+      --bg: #f7f6f2;
+      --surface: #ffffff;
+      --surface-2: #f1efe9;
+      --text: #22201c;
+      --muted: #6f6b63;
+      --border: #dad6ce;
+      --accent: #0f6c73;
+      --accent-2: #dbe9e7;
+      --radius: 16px;
+      --shadow: 0 10px 30px rgba(0,0,0,.06);
+      --max: 960px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    .wrap {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .hero, .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 28px;
+      margin-bottom: 20px;
+    }
+    h1, h2, h3 { line-height: 1.15; margin: 0 0 12px; }
+    h1 { font-size: clamp(2rem, 3vw, 3rem); }
+    h2 { font-size: 1.35rem; margin-top: 0; }
+    h3 { font-size: 1rem; }
+    p, li { font-size: 1rem; }
+    .meta {
+      color: var(--muted);
+      font-size: .95rem;
+      margin-bottom: 10px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+    .card { padding: 22px; }
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #faf9f6;
+      border: 1px solid var(--border);
+      padding: 18px;
+      border-radius: 12px;
+      overflow: auto;
+      font-size: 14px;
+    }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    ul { margin: 10px 0 0 20px; }
+    .pill {
+      display: inline-block;
+      background: var(--accent-2);
+      color: var(--accent);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: .9rem;
+      margin: 0 8px 8px 0;
+    }
+    .copy {
+      display: inline-block;
+      text-decoration: none;
+      background: var(--accent);
+      color: white;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+    .small { color: var(--muted); font-size: .92rem; }
+    @media (min-width: 860px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <div class="meta">Builder prompt for an AI coding assistant</div>
+      <h1>Bucks Party Web App Prompt</h1>
+      <p>Use the prompt below to build a minimalist, mobile-first party web app for around 12 concurrent users. The UX should prioritize a clear primary action, large touch targets, low-friction flows, and BAC as an estimate-only informational feature rather than legal or safety advice. [web:44][web:41][web:33][web:25]</p>
+      <div>
+        <span class="pill">Mobile first</span>
+        <span class="pill">Minimalist UI</span>
+        <span class="pill">12 users</span>
+        <span class="pill">Shared party room</span>
+        <span class="pill">BAC estimate only</span>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Builder prompt</h2>
+        <pre><code>Build a mobile-first web app for a private bucks party with around 12 concurrent users in a single shared party room. The app should feel minimalist, fast, touch-friendly, and simple to use while people are socializing and drinking. Optimize for phones first, especially screens around 360–390px wide, with large tap targets, minimal typing, and clear visual hierarchy. [web:44][web:46][web:41]
+
+Product goal:
+Create a lightweight shared party utility where users can log drinks, see their current drink tally and estimated BAC, vote on proposed rules or ideas, manage games and scores, and view live leaderboards.
+
+Core first-time user flow:
+1. User opens app on phone.
+2. User enters their name.
+3. User lands on the home page.
+4. Home page has a clean minimalist layout with large touch-friendly buttons.
+5. The largest and top-most button is “Add a Drink”.
+6. Below it are smaller buttons: “Games”, “Leaderboards”, “Vote”, and “Settings”.
+7. On the home page, also display the user’s current drinks number and current estimated BAC near the top so this information is visible immediately.
+8. Lower on the home page, show the current drinks leaderboard.
+9. If the user scrolls further, show a list of items that currently have net positive “for” votes from the vote system.
+
+Home page requirements:
+- Mobile-first single-column layout.
+- “Add a Drink” must be the dominant visual action.
+- Show current drink tally and current estimated BAC as summary cards or compact info blocks.
+- Show current drinks leaderboard lower on the screen.
+- Show a scrollable section of currently active or positively voted “for” items below the leaderboard.
+- Keep the design minimalist, with lots of breathing room, simple typography, subtle borders, and no clutter. [web:44][web:46]
+
+Add a Drink flow:
+When the user taps “Add a Drink”, open a screen or sheet with three large buttons:
+- Beer
+- Wine
+- Spirits
+
+From there, guide the user through a logical, low-friction flow to choose drink details and log the drink.
+
+Drink logging should:
+- Increase the user’s personal drink tally.
+- Increase or recalculate the user’s estimated BAC.
+- Store each drink with timestamp.
+- Support quick presets to minimize typing.
+
+Suggested drink flows:
+- Beer: choose common sizes and strengths.
+- Wine: choose glass size and ABV or standard preset.
+- Spirits: choose shot or mixed drink size and spirit strength.
+
+BAC requirements:
+- BAC must be clearly labeled as an estimate only.
+- BAC must not be framed as medical, legal, or driving advice.
+- Add a visible disclaimer that users should not use the app to decide whether it is safe or legal to drive.
+- Use profile inputs like weight, sex, and time of first drink to estimate BAC.
+- Use standard drink calculations and elapsed time in the estimate. [web:33][web:25][web:36]
+
+Games section:
+The Games page should:
+- Show a list of games.
+- Allow adding a new game.
+- Allow selecting who is playing from the party members.
+- Allow entering and updating scores.
+- Support simple party game scorekeeping.
+- Feed game results into leaderboards.
+
+Examples of game support:
+- Beer pong
+- Pool
+- Darts
+- Trivia
+- Any custom named game
+
+Leaderboards section:
+The Leaderboards page should show live rankings for:
+- Drinks consumed
+- Estimated BAC
+- Games / wins / score totals
+- Optional overall points if there is a sensible combined model
+
+Vote section:
+The Vote page should:
+- Have a text input to submit a new rule, challenge, or proposal.
+- Show the current vote list.
+- Let each item be voted “for” or “against”.
+- Show current totals clearly.
+- Make it very easy to vote quickly on mobile.
+- Surface the positively voted items back onto the home page lower down as a scrolling section.
+
+Settings section:
+The Settings page should allow the user to set or edit:
+- Name
+- Weight
+- Sex or BAC profile inputs
+- Preferred units / drink presets
+- Optional profile picture or avatar
+- Reset or clear personal drink history
+- Session preferences or party settings if needed
+
+Nice-to-have features:
+- Profile pictures for each member.
+- Avatar circles beside names in leaderboards, votes, and games.
+- Lightweight real-time sync for all users in the same room.
+- Optimistic UI updates so votes and drink logs feel instant.
+
+Design direction:
+- Minimalist and modern.
+- Mobile-first, not a desktop dashboard crammed onto a phone.
+- Large primary action on the home screen.
+- Smaller secondary actions below it.
+- Strong spacing and obvious hierarchy.
+- Clean cards, subtle borders, soft background, restrained color palette.
+- No enterprise/admin-panel feel.
+- No visual clutter, gimmicks, or over-designed gradients. [web:44][web:40][web:46]
+
+Technical requirements:
+- Build as a web app, not a native app.
+- Design for about 12 simultaneous users in one shared event.
+- Prefer a simple, reliable architecture.
+- Support one shared party room/session.
+- Data model should support users, drinks, drink entries, BAC profile data, votes, games, scores, and leaderboard calculations.
+- Profile pictures should be optional.
+
+Suggested implementation approach:
+- Use a mobile-first frontend.
+- Use a simple backend or hosted realtime database.
+- Prioritize the first-time phone flow, homepage, drink logging flow, voting flow, and live leaderboard updates before advanced polish.
+- Reduce typing wherever possible by using presets, chips, segmented controls, and buttons. [web:46]
+
+Suggested tech stack:
+- React or Next.js frontend
+- Supabase for auth-lite session data, database, realtime updates, and optional profile image storage
+- Simple room/session model instead of complex accounts
+- Responsive component system optimized for mobile
+
+Suggested data model:
+- party_rooms
+- users
+- drink_entries
+- vote_items
+- vote_responses
+- games
+- game_players
+- game_scores
+- leaderboard_views or computed queries
+
+Important UX rules:
+- The user should understand the home screen in under 2 seconds.
+- “Add a Drink” must always be the clearest next action. [web:44][web:46]
+- Keep common tasks to 1–2 taps where possible.
+- Use progressive disclosure and avoid long forms. [web:44]
+- Make vote interactions and drink logging extremely fast.
+- Keep all content readable and usable on a phone in one hand.
+
+Deliverables requested from the AI coder:
+1. App architecture and feature breakdown
+2. Screen-by-screen UI plan
+3. Component list
+4. Database schema
+5. Realtime event flow
+6. MVP build plan
+7. Actual implementation of the app
+
+Final product principle:
+Favor speed, clarity, and low-friction mobile interactions over feature richness. This is a social event web app for real-time use during a live bucks party, so it must feel simple, fast, and obvious. [web:43][web:46]</code></pre>
+      </section>
+
+      <section class="card">
+        <h2>Notes to include</h2>
+        <ul>
+          <li>Ask the coder to make BAC screens and labels visibly disclaimer-based, since BAC calculators are approximate and not suitable for drive/no-drive decisions. [web:33][web:25]</li>
+          <li>Keep the homepage sparse, because mobile-first guidance emphasizes clear hierarchy, reduced clutter, and obvious primary actions. [web:44][web:46]</li>
+          <li>Use large buttons and touch-friendly controls, which are repeatedly recommended in mobile UI guidance. [web:41][web:46]</li>
+          <li>Use presets for drink types and scoring inputs to reduce typing during the event. [web:46]</li>
+          <li>Realtime sync should be light and robust for about 12 users, which fits your party-room concept and current app direction. [cite:38]</li>
+        </ul>
+        <p class="small">This file is meant to be copied directly into your AI coder, or shared as a design-and-build brief. It includes the extra homepage BAC/drinks summary and the scrolled list of positively voted items that you just added. [cite:38]</p>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
