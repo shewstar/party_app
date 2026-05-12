@@ -43,13 +43,19 @@ export type PeakBacResult =
   | { status: "ok"; value: number; atMs: number | null }
   | { status: "missing_profile" };
 
-export function peakBAC(user: UserRow, drinks: DrinkRow[]): PeakBacResult {
+export function peakBAC(
+  user: UserRow,
+  drinks: DrinkRow[],
+  sessionStartOverrideMs?: number,
+): PeakBacResult {
   if (!user.weight_kg) return { status: "missing_profile" };
   if (drinks.length === 0) return { status: "ok", value: 0, atMs: null };
 
-  const sessionStartMs = user.first_drink_at
-    ? new Date(user.first_drink_at).getTime()
-    : Math.min(...drinks.map((d) => new Date(d.logged_at).getTime()));
+  const sessionStartMs =
+    sessionStartOverrideMs ??
+    (user.first_drink_at
+      ? new Date(user.first_drink_at).getTime()
+      : Math.min(...drinks.map((d) => new Date(d.logged_at).getTime())));
 
   const sorted = [...drinks]
     .map((d) => ({ t: new Date(d.logged_at).getTime(), d }))

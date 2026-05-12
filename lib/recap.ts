@@ -6,6 +6,48 @@ import type {
   VoteTallyRow,
 } from "./supabase/types";
 
+// A "party day" runs from 5am to 5am next day, so a session crossing midnight
+// stays grouped together.
+export const PARTY_CUTOFF_HOUR = 5;
+
+export function partyDayKey(
+  timestamp: Date | string | number,
+  cutoffHour = PARTY_CUTOFF_HOUR,
+): string {
+  const d = new Date(timestamp);
+  if (d.getHours() < cutoffHour) d.setDate(d.getDate() - 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function partyDayWindow(
+  key: string,
+  cutoffHour = PARTY_CUTOFF_HOUR,
+): { startMs: number; endMs: number } {
+  const [y, m, d] = key.split("-").map(Number);
+  const start = new Date(y, m - 1, d, cutoffHour, 0, 0, 0);
+  const end = new Date(y, m - 1, d + 1, cutoffHour, 0, 0, 0);
+  return { startMs: start.getTime(), endMs: end.getTime() };
+}
+
+export function formatPartyDay(key: string, todayKey: string): string {
+  if (key === todayKey) return "Tonight";
+  const { startMs } = partyDayWindow(key);
+  return new Date(startMs).toLocaleDateString([], {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export function availablePartyDays(drinks: DrinkRow[]): string[] {
+  const keys = new Set<string>();
+  for (const d of drinks) keys.add(partyDayKey(d.logged_at));
+  return [...keys].sort((a, b) => (a < b ? 1 : -1));
+}
+
 export function topDrinkLabel(drinks: DrinkRow[]): string | null {
   if (drinks.length === 0) return null;
   const counts = new Map<string, number>();
