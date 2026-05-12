@@ -21,9 +21,9 @@ const WHEEL_COLORS = [
   "#c2185b",
 ];
 
-const R = 130;
-const SPIN_MS = 4000;
-const FULL_SPINS = 5;
+const R = 180;
+const SPIN_MS = 8000;
+const FULL_SPINS = 10;
 
 function polar(angleDeg: number, radius: number) {
   const rad = (angleDeg * Math.PI) / 180;
@@ -129,7 +129,7 @@ export default function SpinPage() {
   }
 
   const n = pool.length;
-  const labelFontSize = n > 10 ? 9 : n > 6 ? 11 : 13;
+  const labelFontSize = n > 10 ? 13 : n > 6 ? 16 : 19;
 
   return (
     <main className="flex-1 flex flex-col">
@@ -174,12 +174,10 @@ export default function SpinPage() {
         </Card>
 
         <div className="flex items-center justify-center py-2">
-          <div className="relative">
+          <div className="relative w-full max-w-[420px]">
             <svg
-              width={300}
-              height={300}
-              viewBox="-150 -150 300 300"
-              className="overflow-visible"
+              viewBox="-200 -200 400 400"
+              className="w-full h-auto overflow-visible"
             >
               <g
                 style={{
@@ -205,7 +203,7 @@ export default function SpinPage() {
                       x={0}
                       y={0}
                       fill="white"
-                      fontSize={16}
+                      fontSize={22}
                       fontWeight={600}
                       textAnchor="middle"
                       dominantBaseline="middle"
@@ -244,9 +242,9 @@ export default function SpinPage() {
                     );
                   })}
               </g>
-              <circle r={10} fill="#1f2937" stroke="#fff" strokeWidth={2} />
+              <circle r={14} fill="#1f2937" stroke="#fff" strokeWidth={2} />
               <polygon
-                points={`0,${-R - 14} -10,${-R + 6} 10,${-R + 6}`}
+                points={`0,${-R - 18} -14,${-R + 8} 14,${-R + 8}`}
                 fill="#1f2937"
                 stroke="#fff"
                 strokeWidth={2}
