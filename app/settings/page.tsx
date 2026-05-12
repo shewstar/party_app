@@ -38,13 +38,22 @@ export default function SettingsPage() {
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
+    let weight_kg: number | null = null;
+    if (weight) {
+      const w = Number(weight);
+      if (isNaN(w) || w < 20 || w > 300) {
+        setMsg("Weight must be between 20 and 300 kg.");
+        return;
+      }
+      weight_kg = w;
+    }
     setSaving(true);
     setMsg(null);
     const { error } = await supabase()
       .from("users")
       .update({
         name: name.trim(),
-        weight_kg: weight ? Number(weight) : null,
+        weight_kg,
         first_drink_at: firstDrink ? new Date(firstDrink).toISOString() : null,
       })
       .eq("id", user.id);
@@ -134,6 +143,9 @@ export default function SettingsPage() {
                 onChange={(e) => setWeight(e.target.value)}
                 type="number"
                 inputMode="decimal"
+                min={20}
+                max={300}
+                step="any"
                 className="border border-line rounded-card px-3 py-2 bg-surface"
               />
             </label>

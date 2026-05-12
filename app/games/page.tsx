@@ -105,6 +105,7 @@ export default function GamesPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Beer pong, darts, pool…"
+                  maxLength={40}
                   className="border border-line rounded-card px-3 py-2 bg-surface"
                 />
               </label>
