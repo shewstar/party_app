@@ -9,7 +9,7 @@ import { ensureUserId, useUser } from "@/lib/user-context";
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user, loading } = useUser();
+  const { user, loading, refresh } = useUser();
   const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +32,7 @@ export default function OnboardingPage() {
       setSubmitting(false);
       return;
     }
+    await refresh();
     router.replace("/");
   }
 

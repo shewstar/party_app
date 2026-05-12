@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import TopBar from "@/components/TopBar";
 import Card from "@/components/Card";
 import BigButton from "@/components/BigButton";
 import Avatar from "@/components/Avatar";
 import { supabase } from "@/lib/supabase/browser";
-import { clearUserId } from "@/lib/session";
 import { useUser } from "@/lib/user-context";
 
 function toLocalInput(iso: string | null): string {
@@ -18,7 +16,6 @@ function toLocalInput(iso: string | null): string {
 }
 
 export default function SettingsPage() {
-  const router = useRouter();
   const { user, loading, refresh } = useUser();
   const [name, setName] = useState("");
   const [weight, setWeight] = useState("");
@@ -97,12 +94,6 @@ export default function SettingsPage() {
     else setMsg("Drink history cleared.");
   }
 
-  async function leaveParty() {
-    if (!confirm("Forget this device's identity? You'll be onboarded as a new user.")) return;
-    clearUserId();
-    router.replace("/onboarding");
-  }
-
   return (
     <main className="flex-1 flex flex-col">
       <TopBar title="Settings" />
@@ -170,9 +161,6 @@ export default function SettingsPage() {
           <div className="flex flex-col gap-3">
             <BigButton variant="danger" onClick={clearDrinks}>
               Clear my drink history
-            </BigButton>
-            <BigButton variant="secondary" onClick={leaveParty}>
-              Forget this device
             </BigButton>
           </div>
         </Card>

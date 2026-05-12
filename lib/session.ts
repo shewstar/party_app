@@ -29,7 +29,3 @@ export function getUserId(): string | null {
   return window.localStorage.getItem(USER_ID_KEY);
 }
 
-export function clearUserId(): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(USER_ID_KEY);
-}

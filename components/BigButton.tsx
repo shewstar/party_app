@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import Link from "next/link";
 import clsx from "./clsx";
 
 type Props = {
@@ -37,9 +38,9 @@ export default function BigButton({
   );
   if (href) {
     return (
-      <a href={href} className={cls} aria-disabled={disabled}>
+      <Link href={href} className={cls} aria-disabled={disabled}>
         {children}
-      </a>
+      </Link>
     );
   }
   return (

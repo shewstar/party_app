@@ -35,8 +35,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   async function loadUser(id: string) {
-    const { data } = await supabase().from("users").select("*").eq("id", id).maybeSingle();
-    setUser(data ?? null);
+    const { data, error } = await supabase().from("users").select("*").eq("id", id).maybeSingle();
+    if (error) return null;
+    if (data) setUser(data);
     return data;
   }
 
@@ -45,14 +46,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
     setUserId(id);
     if (!id) {
       setLoading(false);
-      if (pathname !== "/onboarding") router.replace("/onboarding");
       return;
     }
-    loadUser(id).then((u) => {
-      setLoading(false);
-      if (!u && pathname !== "/onboarding") router.replace("/onboarding");
-    });
-  }, [pathname, router]);
+    loadUser(id).finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user && pathname !== "/onboarding") {
+      router.replace("/onboarding");
+    }
+  }, [loading, user, pathname, router]);
 
   useEffect(() => {
     if (!userId) return;
@@ -75,7 +79,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       refresh: async () => {
-        if (userId) await loadUser(userId);
+        const id = getUserId();
+        if (id !== userId) setUserId(id);
+        if (!id) {
+          setUser(null);
+          return;
+        }
+        await loadUser(id);
       },
     }),
     [userId, user, loading],

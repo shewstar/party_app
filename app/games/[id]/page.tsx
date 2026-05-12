@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import TopBar from "@/components/TopBar";
 import Card from "@/components/Card";
@@ -15,6 +15,14 @@ export default function GameDetailPage() {
   const [game, setGame] = useState<GameRow | null>(null);
   const [totals, setTotals] = useState<GameTotalsRow[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [frozenOrder, setFrozenOrder] = useState<string[] | null>(null);
+  const resortTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resortTimer.current) clearTimeout(resortTimer.current);
+    };
+  }, []);
 
   async function load() {
     if (!id) return;
@@ -51,6 +59,15 @@ export default function GameDetailPage() {
 
   async function bump(userId: string, delta: number) {
     if (!game) return;
+    setFrozenOrder((prev) => {
+      if (prev) return prev;
+      return [...totals]
+        .sort((a, b) => Number(b.total_score) - Number(a.total_score))
+        .map((t) => t.user_id);
+    });
+    if (resortTimer.current) clearTimeout(resortTimer.current);
+    resortTimer.current = setTimeout(() => setFrozenOrder(null), 1500);
+
     setBusy(`${userId}:${delta}`);
     // Optimistic.
     setTotals((arr) =>
@@ -80,7 +97,14 @@ export default function GameDetailPage() {
     );
   }
 
-  const sorted = [...totals].sort((a, b) => Number(b.total_score) - Number(a.total_score));
+  const sorted = frozenOrder
+    ? [
+        ...frozenOrder
+          .map((id) => totals.find((t) => t.user_id === id))
+          .filter((r): r is GameTotalsRow => !!r),
+        ...totals.filter((t) => !frozenOrder.includes(t.user_id)),
+      ]
+    : [...totals].sort((a, b) => Number(b.total_score) - Number(a.total_score));
 
   return (
     <main className="flex-1 flex flex-col">
