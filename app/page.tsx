@@ -18,19 +18,35 @@ export default function HomePage() {
   const [myDrinks, setMyDrinks] = useState<DrinkRow[]>([]);
   const [board, setBoard] = useState<DrinksLeaderboardRow[]>([]);
   const [forItems, setForItems] = useState<VoteTallyRow[]>([]);
+  const [newVoteCount, setNewVoteCount] = useState(0);
 
   async function loadAll(uid?: string) {
     const s = supabase();
-    const [{ data: drinks }, { data: lb }, { data: tally }] = await Promise.all([
+    const [
+      { data: drinks },
+      { data: lb },
+      { data: tally },
+      { data: voteIds },
+      { data: myResponses },
+    ] = await Promise.all([
       uid
         ? s.from("drink_entries").select("*").eq("user_id", uid).order("logged_at", { ascending: false })
         : Promise.resolve({ data: [] as DrinkRow[] }),
       s.from("v_drinks_leaderboard").select("*").order("drink_count", { ascending: false }).limit(5),
       s.from("v_vote_tally").select("*").gt("net", 0).order("net", { ascending: false }),
+      s.from("vote_items").select("id"),
+      uid
+        ? s.from("vote_responses").select("vote_item_id").eq("user_id", uid)
+        : Promise.resolve({ data: [] as { vote_item_id: string }[] }),
     ]);
     setMyDrinks((drinks ?? []) as DrinkRow[]);
     setBoard((lb ?? []) as DrinksLeaderboardRow[]);
     setForItems((tally ?? []) as VoteTallyRow[]);
+    const voted = new Set(
+      ((myResponses ?? []) as { vote_item_id: string }[]).map((r) => r.vote_item_id),
+    );
+    const unvoted = ((voteIds ?? []) as { id: string }[]).filter((v) => !voted.has(v.id)).length;
+    setNewVoteCount(unvoted);
   }
 
   useEffect(() => {
@@ -107,7 +123,7 @@ export default function HomePage() {
       <div className="grid grid-cols-2 gap-3">
         <Tile href="/games" icon="🎯" label="Games" sub="Score it" />
         <Tile href="/leaderboards" icon="🏆" label="Leaderboards" sub="Who's winning" />
-        <Tile href="/vote" icon="🗳️" label="Vote" sub="Propose rules" />
+        <Tile href="/vote" icon="🗳️" label="Vote" sub="Propose rules" badge={newVoteCount} />
         <Tile href="/settings" icon="⚙️" label="Settings" sub="You & BAC" />
       </div>
 

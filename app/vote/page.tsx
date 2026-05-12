@@ -46,7 +46,19 @@ export default function VotePage() {
     e.preventDefault();
     if (!user || !text.trim()) return;
     setPosting(true);
-    await supabase().from("vote_items").insert({ proposer_id: user.id, text: text.trim() });
+    const s = supabase();
+    const { data: inserted } = await s
+      .from("vote_items")
+      .insert({ proposer_id: user.id, text: text.trim() })
+      .select("id")
+      .single();
+    if (inserted?.id) {
+      await s.from("vote_responses").insert({
+        vote_item_id: inserted.id,
+        user_id: user.id,
+        value: 1,
+      });
+    }
     setText("");
     setPosting(false);
   }
