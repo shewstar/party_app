@@ -125,6 +125,7 @@ export default function HomePage() {
         <Tile href="/leaderboards" icon="🏆" label="Leaderboards" sub="Who's winning" />
         <Tile href="/vote" icon="🗳️" label="Vote" sub="Propose rules" badge={newVoteCount} />
         <Tile href="/settings" icon="⚙️" label="Settings" sub="You & BAC" />
+        <Tile href="/spin" icon="🎡" label="Spin" sub="Pick someone" className="col-span-2" />
         <Tile href="/recap" icon="🏁" label="Recap" sub="End-of-night stats" className="col-span-2" />
       </div>
 

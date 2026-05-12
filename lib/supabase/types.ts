@@ -83,3 +83,11 @@ export type GameTotalsRow = {
   total_score: number;
 };
 
+export type SpinRow = {
+  id: string;
+  spinner_id: string | null;
+  winner_id: string;
+  pool: string[];
+  created_at: string;
+};
+
