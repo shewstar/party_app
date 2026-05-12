@@ -179,7 +179,7 @@ export default function AddDrinkPage() {
           {presetId === "custom" && (
             <>
               <div className="flex gap-3 mt-4">
-                <label className="flex-1 flex flex-col gap-1">
+                <label className="flex-1 min-w-0 flex flex-col gap-1">
                   <span className="text-xs text-muted">Volume (ml)</span>
                   <input
                     type="number"
@@ -189,10 +189,10 @@ export default function AddDrinkPage() {
                   step="any"
                     value={customVol}
                     onChange={(e) => setCustomVol(e.target.value)}
-                    className="border border-line rounded-card px-3 py-2 bg-surface"
+                    className="w-full border border-line rounded-card px-3 py-2 bg-surface"
                   />
                 </label>
-                <label className="flex-1 flex flex-col gap-1">
+                <label className="flex-1 min-w-0 flex flex-col gap-1">
                   <span className="text-xs text-muted">ABV (%)</span>
                   <input
                     type="number"
@@ -202,7 +202,7 @@ export default function AddDrinkPage() {
                   step="any"
                     value={customAbv}
                     onChange={(e) => setCustomAbv(e.target.value)}
-                    className="border border-line rounded-card px-3 py-2 bg-surface"
+                    className="w-full border border-line rounded-card px-3 py-2 bg-surface"
                   />
                 </label>
               </div>

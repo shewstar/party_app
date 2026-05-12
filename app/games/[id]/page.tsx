@@ -5,9 +5,11 @@ import { useParams } from "next/navigation";
 import TopBar from "@/components/TopBar";
 import Card from "@/components/Card";
 import Avatar from "@/components/Avatar";
+import BigButton from "@/components/BigButton";
+import Chip from "@/components/Chip";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
-import type { GameRow, GameTotalsRow } from "@/lib/supabase/types";
+import type { GameRow, GameTotalsRow, UserRow } from "@/lib/supabase/types";
 
 export default function GameDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -17,6 +19,9 @@ export default function GameDetailPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [frozenOrder, setFrozenOrder] = useState<string[] | null>(null);
   const resortTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showAddPlayers, setShowAddPlayers] = useState(false);
+  const [members, setMembers] = useState<UserRow[]>([]);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     return () => {
@@ -85,6 +90,33 @@ export default function GameDetailPage() {
     setBusy(null);
   }
 
+  async function openAddPlayers() {
+    setPicked(new Set());
+    if (!showAddPlayers) {
+      const { data } = await supabase().from("users").select("*").order("created_at", { ascending: true });
+      setMembers((data ?? []) as UserRow[]);
+    }
+    setShowAddPlayers(!showAddPlayers);
+  }
+
+  function togglePick(id: string) {
+    setPicked((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  }
+
+  async function addPlayers(e: React.FormEvent) {
+    e.preventDefault();
+    if (!game || picked.size === 0) return;
+    const rows = Array.from(picked).map((uid) => ({ game_id: game.id, user_id: uid }));
+    await supabase().from("game_players").insert(rows);
+    setPicked(new Set());
+    setShowAddPlayers(false);
+  }
+
   if (loading || !user) {
     return <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>;
   }
@@ -106,10 +138,51 @@ export default function GameDetailPage() {
       ]
     : [...totals].sort((a, b) => Number(b.total_score) - Number(a.total_score));
 
+  const existingIds = new Set(totals.map((t) => t.user_id));
+  const available = members.filter((m) => !existingIds.has(m.id));
+
   return (
     <main className="flex-1 flex flex-col">
       <TopBar title={game.name} />
       <div className="px-5 py-4 flex flex-col gap-3">
+        <BigButton onClick={openAddPlayers} variant="secondary">
+          ➕ Add players
+        </BigButton>
+
+        {showAddPlayers && (
+          <Card>
+            <form onSubmit={addPlayers} className="flex flex-col gap-3">
+              <span className="text-sm font-medium">Add players to {game.name}</span>
+              <div className="flex flex-wrap gap-2">
+                {available.map((m) => (
+                  <Chip key={m.id} active={picked.has(m.id)} onClick={() => togglePick(m.id)}>
+                    {m.name}
+                  </Chip>
+                ))}
+                {available.length === 0 && (
+                  <span className="text-sm text-muted">Everyone's already playing.</span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={openAddPlayers}
+                  className="flex-1 rounded-card border border-line bg-surface py-2"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={picked.size === 0}
+                  className="flex-1 rounded-card bg-accent text-white py-2 font-semibold disabled:opacity-50"
+                >
+                  Add
+                </button>
+              </div>
+            </form>
+          </Card>
+        )}
+
         {sorted.length === 0 && (
           <Card>
             <p className="text-sm text-muted text-center">No players selected for this game.</p>
