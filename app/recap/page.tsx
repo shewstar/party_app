@@ -416,15 +416,24 @@ function RecapPageInner() {
     fun: myBadgeGroups.filter((g) => g.achievement.tier === "fun"),
   };
   const myBadgeIds = new Set(myBadgeGroups.map((g) => g.achievement.id));
-  const otherBadgesById = new Map<string, { badge: typeof allBadges[number]; users: UserRow[] }>();
+  // Dedupe users per badge — per-trigger badges (in-sync, double-down, etc.)
+  // emit one EarnedBadge per occurrence, so the same user can appear many
+  // times for the same badge id within `allBadges`.
+  const otherBadgesById = new Map<string, { badge: typeof allBadges[number]; users: UserRow[]; seen: Set<string> }>();
   for (const b of allBadges) {
     if (b.userId === user?.id) continue;
     if (myBadgeIds.has(b.id)) continue;
     const u = userById.get(b.userId);
     if (!u) continue;
     const entry = otherBadgesById.get(b.id);
-    if (entry) entry.users.push(u);
-    else otherBadgesById.set(b.id, { badge: b, users: [u] });
+    if (entry) {
+      if (!entry.seen.has(u.id)) {
+        entry.seen.add(u.id);
+        entry.users.push(u);
+      }
+    } else {
+      otherBadgesById.set(b.id, { badge: b, users: [u], seen: new Set([u.id]) });
+    }
   }
   const otherBadgeRows = [...otherBadgesById.values()].sort((a, b) =>
     a.badge.tier === b.badge.tier ? 0 : a.badge.tier === "win" ? -1 : 1,
