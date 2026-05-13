@@ -12,6 +12,25 @@ import { useRouter, usePathname } from "next/navigation";
 import { supabase } from "./supabase/browser";
 import type { UserRow } from "./supabase/types";
 import { getOrCreateUserId, getUserId } from "./session";
+import { partyDayKey } from "./recap";
+
+const APP_OPEN_THROTTLE_MS = 5 * 60 * 1000;
+const APP_OPEN_KEY_PREFIX = "lastAppOpen";
+
+async function logAppOpen(userId: string) {
+  try {
+    const key = `${APP_OPEN_KEY_PREFIX}:${userId}`;
+    const last = Number(localStorage.getItem(key) ?? 0);
+    const now = Date.now();
+    if (last && now - last < APP_OPEN_THROTTLE_MS) return;
+    localStorage.setItem(key, String(now));
+    await supabase()
+      .from("app_opens")
+      .insert({ user_id: userId, party_day: partyDayKey(now) });
+  } catch {
+    // ignore — logging failures shouldn't break the app
+  }
+}
 
 type Ctx = {
   userId: string | null;
@@ -49,6 +68,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
       return;
     }
     loadUser(id).finally(() => setLoading(false));
+    logAppOpen(id);
   }, []);
 
   useEffect(() => {

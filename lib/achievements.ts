@@ -1,10 +1,13 @@
 import type {
+  AppOpenRow,
   CameraPhotoRow,
   DrinkRow,
   GamePlayerRow,
   GameRow,
   GameScoreRow,
   GameTotalsRow,
+  ItineraryEventRow,
+  ItineraryReactionRow,
   SpinRow,
   UserRow,
   VoteItemRow,
@@ -44,6 +47,9 @@ export type AchievementCtx = {
   gameTotals: GameTotalsRow[];
   spins: SpinRow[];
   photos: CameraPhotoRow[];
+  itineraryEvents: ItineraryEventRow[];
+  itineraryReactions: ItineraryReactionRow[];
+  appOpens: AppOpenRow[];
   windowStartMs: number;
   windowEndMs: number;
 };
@@ -100,11 +106,40 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "warm-eye", title: "Warm Eye", blurb: "Every photo came out warm.", icon: "🥵", tier: "fun", timing: "endOfDay" },
   { id: "no-pic-no-proof", title: "No Pic No Proof", blurb: "Took zero photos tonight.", icon: "🚫", tier: "fail", timing: "endOfDay" },
 
+  // Itinerary — live
+  { id: "hype-buck", title: "Hype Buck", blurb: "Reacted to 3+ itinerary events.", icon: "📣", tier: "win", timing: "live" },
+  { id: "trendsetter", title: "Trendsetter", blurb: "First to react to an event.", icon: "✨", tier: "fun", timing: "live" },
+  { id: "doom-buck", title: "Doom Buck", blurb: "Dropped the 💀 reaction.", icon: "💀", tier: "fun", timing: "live" },
+  { id: "reaction-czar", title: "Reaction Czar", blurb: "Used all 6 emoji reactions.", icon: "🌈", tier: "win", timing: "live" },
+  // Itinerary — end-of-day
+  { id: "hyped-up", title: "Hyped Up", blurb: "Reacted to every event tonight.", icon: "🎉", tier: "win", timing: "endOfDay" },
+
+  // App opens — live
+  { id: "early-bird", title: "Early Bird", blurb: "First buck to open the app today.", icon: "🌅", tier: "win", timing: "live" },
+  { id: "refresher", title: "Refresher", blurb: "Opened the app 10+ times tonight.", icon: "🔄", tier: "fun", timing: "live" },
+  { id: "locked-in", title: "Locked In", blurb: "Opened the app 100+ times tonight.", icon: "🔒", tier: "fun", timing: "live" },
+  // App opens — end-of-day
+  { id: "last-light", title: "Last Light", blurb: "Last open of the night.", icon: "🌙", tier: "fun", timing: "endOfDay" },
+
+  // Gold-tier drinks
+  { id: "centurion", title: "Centurion", blurb: "20+ drinks in one night.", icon: "💯", tier: "win", timing: "live" },
+  { id: "the-beast", title: "The Beast", blurb: "30+ drinks in one night.", icon: "🦏", tier: "win", timing: "live" },
+  { id: "strong-hand", title: "Strong Hand", blurb: "Avg ≥ 1.5 std drinks per drink (5+).", icon: "💪", tier: "win", timing: "live" },
+  { id: "speed-demon", title: "Speed Demon", blurb: "8 drinks inside a 60-min window.", icon: "💨", tier: "win", timing: "live" },
+  { id: "iron-liver", title: "Iron Liver", blurb: "Peak BAC over 0.20.", icon: "🛡️", tier: "win", timing: "endOfDay" },
+
+  // Gold-tier votes / games / spin
+  { id: "visionary", title: "Visionary", blurb: "Proposed 10+ ideas.", icon: "📜", tier: "win", timing: "endOfDay" },
+  { id: "dynasty", title: "Dynasty", blurb: "Won 5+ finished games.", icon: "🏛️", tier: "win", timing: "endOfDay" },
+  { id: "untouchable", title: "Untouchable", blurb: "Won a finished game by 10+ points.", icon: "⚔️", tier: "win", timing: "endOfDay" },
+  { id: "four-leaf", title: "Four Leaf", blurb: "Picked by the wheel 5+ times.", icon: "🍀", tier: "win", timing: "live" },
+
   // Cross-feature — live
   { id: "renaissance-buck", title: "Renaissance Buck", blurb: "Drank, voted, played, snapped.", icon: "🎭", tier: "win", timing: "live" },
   { id: "hot-streak", title: "Hot Streak", blurb: "Peak BAC > 0.10 and winning a game.", icon: "🔥", tier: "win", timing: "live" },
   // Cross-feature — end-of-day
   { id: "triple-crown", title: "Triple Crown", blurb: "Heavyweight + Champion + Rule Maker.", icon: "🌟", tier: "win", timing: "endOfDay" },
+  { id: "iron-man", title: "Iron Man", blurb: "Centurion + Iron Liver + Dynasty.", icon: "🦾", tier: "win", timing: "endOfDay" },
   { id: "ice-cold", title: "Ice Cold", blurb: "Sober but still won a game.", icon: "🧊", tier: "win", timing: "endOfDay" },
   { id: "no-show", title: "No Show", blurb: "Crickets all night.", icon: "🫥", tier: "fail", timing: "endOfDay" },
 ];
@@ -158,9 +193,21 @@ export function earnedForUser(
     if (drinkCount >= 10) {
       out.push(make("marathon-runner", userId, `${drinkCount} drinks`));
     }
+    if (drinkCount >= 20) {
+      out.push(make("centurion", userId, `${drinkCount} drinks`));
+    }
+    if (drinkCount >= 30) {
+      out.push(make("the-beast", userId, `${drinkCount} drinks`));
+    }
+    if (drinkCount >= 5 && totalStd / drinkCount >= 1.5) {
+      out.push(make("strong-hand", userId, `${(totalStd / drinkCount).toFixed(2)} std avg`));
+    }
     const pace = fastestPace(userDrinks);
     if (pace >= 5) {
       out.push(make("pacesetter", userId, `${pace} in 60 min`));
+    }
+    if (pace >= 8) {
+      out.push(make("speed-demon", userId, `${pace} in 60 min`));
     }
     const cats = new Set(userDrinks.map((d) => d.category));
     if (cats.size === 3) {
@@ -222,6 +269,9 @@ export function earnedForUser(
       if (topUserId === userId && me.status === "ok" && me.value > 0) {
         out.push(make("peak-performer", userId, me.value.toFixed(3)));
       }
+      if (me.status === "ok" && me.value > 0.2) {
+        out.push(make("iron-liver", userId, me.value.toFixed(3)));
+      }
     }
 
     if (drinkCount === 1 || drinkCount === 2) {
@@ -261,6 +311,9 @@ export function earnedForUser(
     if (myTally.some((t) => t.net > 0)) {
       const best = myTally.reduce((a, b) => (a.net >= b.net ? a : b));
       out.push(make("rule-maker", userId, `+${best.net}`));
+    }
+    if (myProposals.length >= 10) {
+      out.push(make("visionary", userId, `${myProposals.length} proposals`));
     }
     if (myTally.some((t) => t.net < 0)) {
       const worst = myTally.reduce((a, b) => (a.net <= b.net ? a : b));
@@ -308,25 +361,38 @@ export function earnedForUser(
     }
   }
   if (wantEnd) {
-    const wins = gameWinsByUser(ctx.gameTotals);
+    const finishedGameIds = new Set(
+      ctx.games.filter((g) => g.finished).map((g) => g.id),
+    );
+    const finishedTotals = ctx.gameTotals.filter((t) =>
+      finishedGameIds.has(t.game_id),
+    );
+    const myFinishedGameIds = new Set(
+      [...myGameIds].filter((id) => finishedGameIds.has(id)),
+    );
+
+    const wins = gameWinsByUser(finishedTotals);
     const myWins = wins.find((r) => r.user_id === userId);
     const topWins = [...wins].sort((a, b) => b.wins - a.wins || b.total - a.total)[0];
     if (topWins && topWins.user_id === userId && topWins.wins > 0) {
       out.push(make("game-champion", userId, `${topWins.wins} W`));
     }
-    if (myGames.length >= 2) {
-      const wonAll = [...myGameIds].every((gameId) => {
-        const totals = ctx.gameTotals.filter((t) => t.game_id === gameId);
+    if (myWins && myWins.wins >= 5) {
+      out.push(make("dynasty", userId, `${myWins.wins} W`));
+    }
+    if (myFinishedGameIds.size >= 2) {
+      const wonAll = [...myFinishedGameIds].every((gameId) => {
+        const totals = finishedTotals.filter((t) => t.game_id === gameId);
         if (totals.length < 2) return false;
         const top = [...totals].sort(
           (a, b) => Number(b.total_score) - Number(a.total_score),
         )[0];
         return top.user_id === userId && Number(top.total_score) > 0;
       });
-      if (wonAll) out.push(make("sweeper", userId, `${myGames.length} games`));
+      if (wonAll) out.push(make("sweeper", userId, `${myFinishedGameIds.size} games`));
     }
-    for (const gameId of myGameIds) {
-      const totals = ctx.gameTotals.filter((t) => t.game_id === gameId);
+    for (const gameId of myFinishedGameIds) {
+      const totals = finishedTotals.filter((t) => t.game_id === gameId);
       if (totals.length < 3) continue;
       const sorted = [...totals].sort(
         (a, b) => Number(a.total_score) - Number(b.total_score),
@@ -337,12 +403,34 @@ export function earnedForUser(
       }
     }
     for (const t of myGameTotals) {
+      if (!finishedGameIds.has(t.game_id)) continue;
       if (Number(t.total_score) === 0) {
-        const totals = ctx.gameTotals.filter((x) => x.game_id === t.game_id);
+        const totals = finishedTotals.filter((x) => x.game_id === t.game_id);
         if (totals.length >= 2) {
           out.push(make("bagel", userId, "0 pts", t.game_id));
           break;
         }
+      }
+    }
+    for (const gameId of myFinishedGameIds) {
+      const totals = finishedTotals.filter((t) => t.game_id === gameId);
+      if (totals.length < 2) continue;
+      const sorted = [...totals].sort(
+        (a, b) => Number(b.total_score) - Number(a.total_score),
+      );
+      if (
+        sorted[0].user_id === userId &&
+        Number(sorted[0].total_score) - Number(sorted[1].total_score) >= 10
+      ) {
+        out.push(
+          make(
+            "untouchable",
+            userId,
+            `+${Number(sorted[0].total_score) - Number(sorted[1].total_score)}`,
+            gameId,
+          ),
+        );
+        break;
       }
     }
     if (myWins && myWins.wins === 0 && myGames.length >= 1) {
@@ -360,6 +448,9 @@ export function earnedForUser(
     }
     if (wonSpins.length >= 3) {
       out.push(make("magnet", userId, `${wonSpins.length}× picked`));
+    }
+    if (wonSpins.length >= 5) {
+      out.push(make("four-leaf", userId, `${wonSpins.length}× picked`));
     }
     if (spunByMe.length >= 5) {
       out.push(make("spinmeister", userId, `${spunByMe.length} spins`));
@@ -392,6 +483,78 @@ export function earnedForUser(
     const flags = activityFlags(ctx, userId);
     if (myPhotos.length === 0 && (flags.drank || flags.voted || flags.played)) {
       out.push(make("no-pic-no-proof", userId));
+    }
+  }
+
+  // ── ITINERARY ──────────────────────────────────────────────────────────
+  const myReactions = ctx.itineraryReactions.filter((r) => r.user_id === userId);
+  if (wantLive) {
+    const reactedEventIds = new Set(myReactions.map((r) => r.event_id));
+    if (reactedEventIds.size >= 3) {
+      out.push(make("hype-buck", userId, `${reactedEventIds.size} events`));
+    }
+    if (myReactions.some((r) => r.reaction === "💀")) {
+      out.push(make("doom-buck", userId));
+    }
+    const distinctEmoji = new Set(myReactions.map((r) => r.reaction));
+    if (distinctEmoji.size >= 6) {
+      out.push(make("reaction-czar", userId, `${distinctEmoji.size} emoji`));
+    }
+    for (const evt of ctx.itineraryEvents) {
+      const evtReactions = ctx.itineraryReactions.filter(
+        (r) => r.event_id === evt.id,
+      );
+      if (evtReactions.length < 2) continue;
+      const sorted = [...evtReactions].sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      );
+      if (sorted[0].user_id === userId) {
+        out.push(make("trendsetter", userId, "first react", evt.id));
+      }
+    }
+  }
+  if (wantEnd) {
+    if (ctx.itineraryEvents.length >= 2) {
+      const reactedEventIds = new Set(myReactions.map((r) => r.event_id));
+      const reactedAll = ctx.itineraryEvents.every((evt) =>
+        reactedEventIds.has(evt.id),
+      );
+      if (reactedAll) {
+        out.push(make("hyped-up", userId, `${ctx.itineraryEvents.length}/${ctx.itineraryEvents.length}`));
+      }
+    }
+  }
+
+  // ── APP OPENS ──────────────────────────────────────────────────────────
+  const myOpens = ctx.appOpens.filter((o) => o.user_id === userId);
+  if (wantLive) {
+    if (ctx.appOpens.length > 0) {
+      const earliest = [...ctx.appOpens].sort(
+        (a, b) =>
+          new Date(a.opened_at).getTime() - new Date(b.opened_at).getTime(),
+      )[0];
+      if (earliest.user_id === userId) {
+        out.push(make("early-bird", userId, "first open"));
+      }
+    }
+    if (myOpens.length >= 10) {
+      out.push(make("refresher", userId, `${myOpens.length} opens`));
+    }
+    if (myOpens.length >= 100) {
+      out.push(make("locked-in", userId, `${myOpens.length} opens`));
+    }
+  }
+  if (wantEnd) {
+    const otherOpens = ctx.appOpens.filter((o) => o.user_id !== userId);
+    if (myOpens.length > 0 && otherOpens.length > 0) {
+      const latest = [...ctx.appOpens].sort(
+        (a, b) =>
+          new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime(),
+      )[0];
+      if (latest.user_id === userId) {
+        out.push(make("last-light", userId, "last open"));
+      }
     }
   }
 
@@ -428,9 +591,23 @@ export function earnedForUser(
     ) {
       out.push(make("triple-crown", userId));
     }
-    // Ice Cold — won at least 1 game but no/zero BAC
+    // Iron Man — composite of three gold-tier badges (mirrors Triple Crown)
+    if (
+      myIds.has("centurion") &&
+      myIds.has("iron-liver") &&
+      myIds.has("dynasty")
+    ) {
+      out.push(make("iron-man", userId));
+    }
+    // Ice Cold — won at least 1 finished game but no/zero BAC
     const user = ctx.users.find((u) => u.id === userId);
-    const wins = gameWinsByUser(ctx.gameTotals).find((r) => r.user_id === userId);
+    const finishedGameIds = new Set(
+      ctx.games.filter((g) => g.finished).map((g) => g.id),
+    );
+    const finishedTotals = ctx.gameTotals.filter((t) =>
+      finishedGameIds.has(t.game_id),
+    );
+    const wins = gameWinsByUser(finishedTotals).find((r) => r.user_id === userId);
     if (user && wins && wins.wins > 0) {
       if (userDrinks.length === 0) {
         out.push(make("ice-cold", userId, "0 drinks"));
