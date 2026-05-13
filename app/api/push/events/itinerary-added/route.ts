@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authorizeWebhook, WebhookPayload } from "@/lib/push/webhook";
+import { authorizeWebhook, pushEnabled, WebhookPayload } from "@/lib/push/webhook";
 import { sendPushToAllExcept } from "@/lib/push/send";
 
 type ItineraryEvent = {
@@ -11,6 +11,9 @@ type ItineraryEvent = {
 export async function POST(req: NextRequest) {
   if (!authorizeWebhook(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  if (!pushEnabled()) {
+    return NextResponse.json({ ok: true, skipped: "push_disabled" });
   }
   const payload = (await req.json().catch(() => null)) as WebhookPayload<ItineraryEvent> | null;
   if (!payload || payload.type !== "INSERT" || !payload.record) {

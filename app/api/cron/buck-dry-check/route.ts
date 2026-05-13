@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authorizeCron } from "@/lib/push/webhook";
+import { authorizeCron, pushEnabled } from "@/lib/push/webhook";
 import { sendPushToAllExcept } from "@/lib/push/send";
 import { supabaseServer } from "@/lib/supabase/server";
 
@@ -9,6 +9,9 @@ const RENOTIFY_COOLDOWN_MS = 60 * 60 * 1000;
 export async function GET(req: NextRequest) {
   if (!authorizeCron(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  if (!pushEnabled()) {
+    return NextResponse.json({ ok: true, skipped: "push_disabled" });
   }
   const supa = supabaseServer();
 
