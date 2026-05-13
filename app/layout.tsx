@@ -5,6 +5,7 @@ import { AchievementsProvider } from "@/lib/achievements-tracker";
 import AchievementToast from "@/components/AchievementToast";
 import PushPermissionBanner from "@/components/PushPermissionBanner";
 import OfflineBanner from "@/components/OfflineBanner";
+import { BatteryProvider } from "@/lib/battery";
 
 export const metadata: Metadata = {
   title: "Bucks Party",
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="font-sans">
+        <BatteryProvider>
         <UserProvider>
           <AchievementsProvider>
             <div className="mx-auto max-w-md min-h-dvh flex flex-col">{children}</div>
@@ -36,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <OfflineBanner />
           </AchievementsProvider>
         </UserProvider>
+        </BatteryProvider>
       </body>
     </html>
   );
