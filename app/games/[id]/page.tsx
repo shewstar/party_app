@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useParams } from "next/navigation";
 import TopBar from "@/components/TopBar";
 import Card from "@/components/Card";
@@ -11,7 +12,7 @@ import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
 import { useHaptic } from "@/lib/haptics";
 import { useOnlineStatus } from "@/lib/offline-queue";
-import { useTableData, useRealtimeReady } from "@/lib/realtime-provider";
+import { useTableData, useRealtimeReady, useRefreshTable } from "@/lib/realtime-provider";
 import type { GameRow, GameTotalsRow, UserRow } from "@/lib/supabase/types";
 
 export default function GameDetailPage() {
@@ -20,6 +21,7 @@ export default function GameDetailPage() {
   const haptic = useHaptic();
   const { online, enqueue } = useOnlineStatus();
   const ready = useRealtimeReady();
+  const refreshTable = useRefreshTable();
   const { data: allGames } = useTableData<GameRow>("games");
   const { data: allTotalsRaw } = useTableData<GameTotalsRow>("v_game_totals");
   const { data: allUsers } = useTableData<UserRow>("users");
@@ -29,10 +31,10 @@ export default function GameDetailPage() {
     [allGames, id],
   );
   // Optimistic score deltas keyed by user_id — applied on top of provider
-  // totals so taps feel instant. Cleared shortly after; realtime refetch
-  // catches up within a moment of the insert.
+  // totals so taps feel instant. Each delta is cleared once the v_game_totals
+  // refetch confirms the server total reflects that insert, avoiding the
+  // double-count window where (server + optimistic) briefly equals 2× the tap.
   const [optimisticDeltas, setOptimisticDeltas] = useState<Record<string, number>>({});
-  const optimisticClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Optimistic finished flag for snappy toggle feedback.
   const [optimisticFinished, setOptimisticFinished] = useState<boolean | null>(null);
   const totals = useMemo(() => {
@@ -55,7 +57,6 @@ export default function GameDetailPage() {
   useEffect(() => {
     return () => {
       if (resortTimer.current) clearTimeout(resortTimer.current);
-      if (optimisticClearTimer.current) clearTimeout(optimisticClearTimer.current);
     };
   }, []);
 
@@ -73,14 +74,22 @@ export default function GameDetailPage() {
 
     setBusy(`${userId}:${delta}`);
     setOptimisticDeltas((prev) => ({ ...prev, [userId]: (prev[userId] ?? 0) + delta }));
-    if (optimisticClearTimer.current) clearTimeout(optimisticClearTimer.current);
-    optimisticClearTimer.current = setTimeout(() => setOptimisticDeltas({}), 1500);
 
     const payload = { game_id: game.id, user_id: userId, score: delta };
     if (!online) {
       enqueue("game_scores", payload);
     } else {
       await supabase().from("game_scores").insert(payload);
+      await refreshTable("v_game_totals");
+      flushSync(() => {
+        setOptimisticDeltas((prev) => {
+          const next = { ...prev };
+          const remaining = (next[userId] ?? 0) - delta;
+          if (remaining === 0) delete next[userId];
+          else next[userId] = remaining;
+          return next;
+        });
+      });
     }
     setBusy(null);
   }
