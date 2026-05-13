@@ -15,7 +15,7 @@ import { useOnlineStatus } from "@/lib/offline-queue";
 import { useTableData, useRealtimeReady, useRefreshTable } from "@/lib/realtime-provider";
 import type { GameRow, GameTotalsRow, UserRow } from "@/lib/supabase/types";
 import FinskaBoard from "@/components/FinskaBoard";
-import { FINSKA } from "@/lib/finska";
+import { FINSKA, shuffle } from "@/lib/finska";
 
 export default function GameDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -115,8 +115,33 @@ export default function GameDetailPage() {
   async function addPlayers(e: React.FormEvent) {
     e.preventDefault();
     if (!game || picked.size === 0) return;
-    const rows = Array.from(picked).map((uid) => ({ game_id: game.id, user_id: uid }));
-    await supabase().from("game_players").insert(rows);
+    const s = supabase();
+    let rows: { game_id: string; user_id: string; throw_order: number | null }[];
+    if (game.preset === FINSKA.id) {
+      // New Finska entrants append to the rotation after the current max
+      // throw_order, in random order among themselves.
+      const { data: existing } = await s
+        .from("game_players")
+        .select("throw_order")
+        .eq("game_id", game.id);
+      const maxOrder = (existing ?? []).reduce(
+        (m, p) => Math.max(m, p.throw_order ?? -1),
+        -1,
+      );
+      const order = shuffle(Array.from(picked));
+      rows = order.map((uid, i) => ({
+        game_id: game.id,
+        user_id: uid,
+        throw_order: maxOrder + 1 + i,
+      }));
+    } else {
+      rows = Array.from(picked).map((uid) => ({
+        game_id: game.id,
+        user_id: uid,
+        throw_order: null,
+      }));
+    }
+    await s.from("game_players").insert(rows);
     setPicked(new Set());
     setShowAddPlayers(false);
   }
@@ -144,6 +169,9 @@ export default function GameDetailPage() {
   }
   const finished = optimisticFinished ?? game.finished;
 
+  const existingIds = new Set(totals.map((t) => t.user_id));
+  const available = members.filter((m) => !existingIds.has(m.id));
+
   if (game.preset === FINSKA.id) {
     return (
       <main className="flex-1 flex flex-col">
@@ -167,6 +195,61 @@ export default function GameDetailPage() {
           finished={finished}
           onAutoFinish={() => toggleFinished(true)}
         />
+        {!finished && (
+          <div className="px-5 pb-6 flex flex-col gap-3">
+            {!showAddPlayers && (
+              <button
+                type="button"
+                onClick={openAddPlayers}
+                className="self-center text-sm text-accent underline"
+              >
+                ➕ Add players
+              </button>
+            )}
+            {showAddPlayers && (
+              <Card>
+                <form onSubmit={addPlayers} className="flex flex-col gap-3">
+                  <span className="text-sm font-medium">Add players to {game.name}</span>
+                  <p className="text-xs text-muted">
+                    New players join the end of the throw rotation and start at 0.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {available.map((m) => (
+                      <Chip
+                        key={m.id}
+                        active={picked.has(m.id)}
+                        onClick={() => togglePick(m.id)}
+                      >
+                        {m.name}
+                      </Chip>
+                    ))}
+                    {available.length === 0 && (
+                      <span className="text-sm text-muted">
+                        Everyone's already playing.
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={openAddPlayers}
+                      className="flex-1 rounded-card border border-line bg-surface py-2"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={picked.size === 0}
+                      className="flex-1 rounded-card bg-accent text-white py-2 font-semibold disabled:opacity-50"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </form>
+              </Card>
+            )}
+          </div>
+        )}
       </main>
     );
   }
@@ -179,9 +262,6 @@ export default function GameDetailPage() {
         ...totals.filter((t) => !frozenOrder.includes(t.user_id)),
       ]
     : [...totals].sort((a, b) => Number(b.total_score) - Number(a.total_score));
-
-  const existingIds = new Set(totals.map((t) => t.user_id));
-  const available = members.filter((m) => !existingIds.has(m.id));
 
   return (
     <main className="flex-1 flex flex-col">
