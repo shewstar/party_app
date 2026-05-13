@@ -14,6 +14,7 @@ import { useUser } from "@/lib/user-context";
 import { useTableData } from "@/lib/realtime-provider";
 import { useOnlineStatus } from "@/lib/offline-queue";
 import { partyDayKey } from "@/lib/recap";
+import { vkey } from "@/lib/storage";
 import { buildTimelineEvents, formatTimeAgo } from "@/lib/timeline-events";
 import type {
   DrinkRow,
@@ -45,6 +46,15 @@ const DrinkBoardRow = memo(function DrinkBoardRow({
   );
 });
 
+function previousPartyDayKey(todayKey: string): string {
+  const [y, m, d] = todayKey.split("-").map(Number);
+  const prev = new Date(y, m - 1, d - 1);
+  const yy = prev.getFullYear();
+  const mm = String(prev.getMonth() + 1).padStart(2, "0");
+  const dd = String(prev.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
 function timeSince(iso: string | null): string {
   if (!iso) return "";
   const diff = Date.now() - new Date(iso).getTime();
@@ -74,6 +84,28 @@ export default function HomePage() {
   const { data: allItinerary } = useTableData<ItineraryEventRow>("itinerary_events");
 
   const todayKey = partyDayKey(Date.now());
+  const previousDayKey = useMemo(() => previousPartyDayKey(todayKey), [todayKey]);
+
+  const hadDrinksLastNight = useMemo(
+    () => (allDrinks as DrinkRow[]).some(
+      (d) => partyDayKey(d.logged_at) === previousDayKey,
+    ),
+    [allDrinks, previousDayKey],
+  );
+
+  const dismissKey = user
+    ? vkey(`previousRecapDismissed:${user.id}:${previousDayKey}`)
+    : null;
+
+  const [previousRecapDismissed, setPreviousRecapDismissed] = useState(false);
+
+  useEffect(() => {
+    if (!dismissKey || typeof window === "undefined") {
+      setPreviousRecapDismissed(false);
+      return;
+    }
+    setPreviousRecapDismissed(window.localStorage.getItem(dismissKey) === "true");
+  }, [dismissKey]);
 
   const myDrinks = useMemo(
     () => (allDrinks as DrinkRow[]).filter((d) => d.user_id === user?.id),
@@ -204,6 +236,30 @@ export default function HomePage() {
           </div>
         </div>
       </Card>
+
+      {hadDrinksLastNight && !previousRecapDismissed && (
+        <Link
+          href={`/recap?day=${previousDayKey}`}
+          onClick={() => {
+            if (dismissKey && typeof window !== "undefined") {
+              window.localStorage.setItem(dismissKey, "true");
+            }
+            setPreviousRecapDismissed(true);
+          }}
+          className="bg-surface border border-line rounded-card shadow-card px-4 py-3 flex items-center gap-3"
+        >
+          <span className="text-2xl" aria-hidden>🌅</span>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs uppercase tracking-wide text-muted">
+              Last night
+            </div>
+            <div className="font-semibold text-sm truncate">
+              See previous night&apos;s recap
+            </div>
+          </div>
+          <span className="text-muted text-sm">→</span>
+        </Link>
+      )}
 
       <Link
         href="/timeline"
