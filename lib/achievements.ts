@@ -134,7 +134,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   // Gold-tier drinks
   { id: "centurion", title: "Centurion", blurb: "20+ drinks in one night.", icon: "💯", tier: "win", timing: "live" },
   { id: "the-beast", title: "The Beast", blurb: "30+ drinks in one night.", icon: "🦏", tier: "win", timing: "live" },
-  { id: "strong-hand", title: "Strong Hand", blurb: "Avg ≥ 1.3 std drinks per drink (5+).", icon: "💪", tier: "win", timing: "live" },
+  { id: "strong-hand", title: "Strong Hand", blurb: "Any 5 drinks in a row averaging ≥ 1.3 std.", icon: "💪", tier: "win", timing: "live" },
   { id: "speed-demon", title: "Speed Demon", blurb: "8 drinks inside a 60-min window.", icon: "💨", tier: "win", timing: "live" },
   { id: "iron-liver", title: "Iron Liver", blurb: "Peak BAC over 0.20.", icon: "🛡️", tier: "win", timing: "endOfDay" },
 
@@ -219,8 +219,28 @@ export function earnedForUser(
     if (drinkCount >= 30) {
       out.push(make("the-beast", userId, `${drinkCount} drinks`, undefined, sortedDrinkTimes[29]));
     }
-    if (drinkCount >= 5 && totalStd / drinkCount >= 1.3) {
-      out.push(make("strong-hand", userId, `${(totalStd / drinkCount).toFixed(2)} std avg`, undefined, sortedDrinkTimes[4]));
+    // Sliding window of 5 consecutive drinks (chronological). Picks the best
+    // 5-in-a-row so a strong stretch isn't diluted by lighter drinks earlier
+    // or later in the night.
+    if (drinkCount >= 5) {
+      const drinksByTime = [...userDrinks].sort(
+        (a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime(),
+      );
+      let bestAvg = 0;
+      let bestEndIdx = -1;
+      for (let i = 4; i < drinksByTime.length; i++) {
+        let windowSum = 0;
+        for (let j = i - 4; j <= i; j++) windowSum += Number(drinksByTime[j].standard_drinks);
+        const avg = windowSum / 5;
+        if (avg > bestAvg) {
+          bestAvg = avg;
+          bestEndIdx = i;
+        }
+      }
+      if (bestAvg >= 1.3) {
+        const earnedAt = new Date(drinksByTime[bestEndIdx].logged_at).getTime();
+        out.push(make("strong-hand", userId, `${bestAvg.toFixed(2)} std avg`, undefined, earnedAt));
+      }
     }
     const pace = fastestPace(userDrinks);
     if (pace >= 5) {
