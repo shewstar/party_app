@@ -127,3 +127,10 @@ export type CameraPhotoRow = {
   taken_at: string;
 };
 
+export type AppOpenRow = {
+  id: string;
+  user_id: string;
+  party_day: string;
+  opened_at: string;
+};
+

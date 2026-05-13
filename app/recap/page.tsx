@@ -26,12 +26,15 @@ import {
 import { earnedForUser, evaluateAchievements } from "@/lib/achievements";
 import { useUser } from "@/lib/user-context";
 import type {
+  AppOpenRow,
   CameraPhotoRow,
   DrinkRow,
   GamePlayerRow,
   GameRow,
   GameScoreRow,
   GameTotalsRow,
+  ItineraryEventRow,
+  ItineraryReactionRow,
   SpinRow,
   UserRow,
   VoteItemRow,
@@ -65,6 +68,9 @@ function RecapPageInner() {
   const [voteTally, setVoteTally] = useState<VoteTallyRow[]>([]);
   const [spins, setSpins] = useState<SpinRow[]>([]);
   const [photos, setPhotos] = useState<CameraPhotoRow[]>([]);
+  const [itineraryEvents, setItineraryEvents] = useState<ItineraryEventRow[]>([]);
+  const [itineraryReactions, setItineraryReactions] = useState<ItineraryReactionRow[]>([]);
+  const [appOpens, setAppOpens] = useState<AppOpenRow[]>([]);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
@@ -82,6 +88,9 @@ function RecapPageInner() {
       { data: vt },
       { data: sp },
       { data: ph },
+      { data: ie },
+      { data: ir },
+      { data: ao },
     ] = await Promise.all([
       s.from("users").select("*"),
       s.from("drink_entries").select("*"),
@@ -94,6 +103,9 @@ function RecapPageInner() {
       s.from("v_vote_tally").select("*"),
       s.from("spins").select("*"),
       s.from("camera_photos").select("*"),
+      s.from("itinerary_events").select("*"),
+      s.from("itinerary_reactions").select("*"),
+      s.from("app_opens").select("*"),
     ]);
     setUsers((u ?? []) as UserRow[]);
     setDrinks((d ?? []) as DrinkRow[]);
@@ -106,6 +118,9 @@ function RecapPageInner() {
     setVoteTally((vt ?? []) as VoteTallyRow[]);
     setSpins((sp ?? []) as SpinRow[]);
     setPhotos((ph ?? []) as CameraPhotoRow[]);
+    setItineraryEvents((ie ?? []) as ItineraryEventRow[]);
+    setItineraryReactions((ir ?? []) as ItineraryReactionRow[]);
+    setAppOpens((ao ?? []) as AppOpenRow[]);
   }
 
   useEffect(() => {
@@ -123,6 +138,9 @@ function RecapPageInner() {
       .on("postgres_changes", { event: "*", schema: "public", table: "vote_responses" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "spins" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "camera_photos" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "itinerary_events" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "itinerary_reactions" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "app_opens" }, load)
       .subscribe();
     return () => {
       s.removeChannel(ch);
@@ -193,6 +211,18 @@ function RecapPageInner() {
     () => photos.filter((p) => p.party_day === selectedDay),
     [photos, selectedDay],
   );
+  const windowedItineraryEvents = useMemo(
+    () => itineraryEvents.filter((e) => inWindow(e.created_at)),
+    [itineraryEvents, dayWindow.startMs, dayWindow.endMs],
+  );
+  const windowedItineraryReactions = useMemo(() => {
+    const ids = new Set(windowedItineraryEvents.map((e) => e.id));
+    return itineraryReactions.filter((r) => ids.has(r.event_id));
+  }, [itineraryReactions, windowedItineraryEvents]);
+  const windowedAppOpens = useMemo(
+    () => appOpens.filter((o) => o.party_day === selectedDay),
+    [appOpens, selectedDay],
+  );
 
   const achievementCtx = useMemo(
     () => ({
@@ -207,6 +237,9 @@ function RecapPageInner() {
       gameTotals: windowedGameTotals,
       spins: windowedSpins,
       photos: windowedPhotos,
+      itineraryEvents: windowedItineraryEvents,
+      itineraryReactions: windowedItineraryReactions,
+      appOpens: windowedAppOpens,
       windowStartMs: dayWindow.startMs,
       windowEndMs: dayWindow.endMs,
     }),
@@ -222,6 +255,9 @@ function RecapPageInner() {
       windowedGameTotals,
       windowedSpins,
       windowedPhotos,
+      windowedItineraryEvents,
+      windowedItineraryReactions,
+      windowedAppOpens,
       dayWindow.startMs,
       dayWindow.endMs,
     ],

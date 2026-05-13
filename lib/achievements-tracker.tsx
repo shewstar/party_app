@@ -15,12 +15,15 @@ import { useUser } from "./user-context";
 import { partyDayKey, partyDayWindow } from "./recap";
 import { earnedForUser, type EarnedBadge } from "./achievements";
 import type {
+  AppOpenRow,
   CameraPhotoRow,
   DrinkRow,
   GamePlayerRow,
   GameRow,
   GameScoreRow,
   GameTotalsRow,
+  ItineraryEventRow,
+  ItineraryReactionRow,
   SpinRow,
   UserRow,
   VoteItemRow,
@@ -127,6 +130,9 @@ export function AchievementsProvider({ children }: { children: ReactNode }) {
   const [gameTotals, setGameTotals] = useState<GameTotalsRow[]>([]);
   const [spins, setSpins] = useState<SpinRow[]>([]);
   const [photos, setPhotos] = useState<CameraPhotoRow[]>([]);
+  const [itineraryEvents, setItineraryEvents] = useState<ItineraryEventRow[]>([]);
+  const [itineraryReactions, setItineraryReactions] = useState<ItineraryReactionRow[]>([]);
+  const [appOpens, setAppOpens] = useState<AppOpenRow[]>([]);
   const [toasts, setToasts] = useState<EarnedBadge[]>([]);
   const [ready, setReady] = useState(false);
   const [dayKey, setDayKey] = useState<string>(() => partyDayKey(Date.now()));
@@ -146,6 +152,9 @@ export function AchievementsProvider({ children }: { children: ReactNode }) {
       { data: gt },
       { data: sp },
       { data: ph },
+      { data: ie },
+      { data: ir },
+      { data: ao },
     ] = await Promise.all([
       s.from("users").select("*"),
       s.from("drink_entries").select("*"),
@@ -158,6 +167,9 @@ export function AchievementsProvider({ children }: { children: ReactNode }) {
       s.from("v_game_totals").select("*"),
       s.from("spins").select("*"),
       s.from("camera_photos").select("*"),
+      s.from("itinerary_events").select("*"),
+      s.from("itinerary_reactions").select("*"),
+      s.from("app_opens").select("*"),
     ]);
     setUsers((u ?? []) as UserRow[]);
     setDrinks((d ?? []) as DrinkRow[]);
@@ -170,6 +182,9 @@ export function AchievementsProvider({ children }: { children: ReactNode }) {
     setGameTotals((gt ?? []) as GameTotalsRow[]);
     setSpins((sp ?? []) as SpinRow[]);
     setPhotos((ph ?? []) as CameraPhotoRow[]);
+    setItineraryEvents((ie ?? []) as ItineraryEventRow[]);
+    setItineraryReactions((ir ?? []) as ItineraryReactionRow[]);
+    setAppOpens((ao ?? []) as AppOpenRow[]);
     setReady(true);
   }, []);
 
@@ -191,6 +206,9 @@ export function AchievementsProvider({ children }: { children: ReactNode }) {
       "spins",
       "camera_photos",
       "users",
+      "itinerary_events",
+      "itinerary_reactions",
+      "app_opens",
     ];
     let ch = s.channel("achievements-tracker");
     for (const t of tables) {
@@ -218,6 +236,10 @@ export function AchievementsProvider({ children }: { children: ReactNode }) {
       const windowedGameIds = new Set(
         games.filter((g) => inWindow(g.created_at)).map((g) => g.id),
       );
+      const windowedEvents = itineraryEvents.filter((e) =>
+        inWindow(e.created_at),
+      );
+      const windowedEventIds = new Set(windowedEvents.map((e) => e.id));
       return {
         users,
         drinks: drinks.filter((d) => inWindow(d.logged_at)),
@@ -238,6 +260,11 @@ export function AchievementsProvider({ children }: { children: ReactNode }) {
         gameTotals: gameTotals.filter((t) => windowedGameIds.has(t.game_id)),
         spins: spins.filter((s) => inWindow(s.created_at)),
         photos: photos.filter((p) => p.party_day === dayKey),
+        itineraryEvents: windowedEvents,
+        itineraryReactions: itineraryReactions.filter((r) =>
+          windowedEventIds.has(r.event_id),
+        ),
+        appOpens: appOpens.filter((o) => o.party_day === dayKey),
         windowStartMs: window.startMs,
         windowEndMs: window.endMs,
       };
@@ -254,6 +281,9 @@ export function AchievementsProvider({ children }: { children: ReactNode }) {
       gameTotals,
       spins,
       photos,
+      itineraryEvents,
+      itineraryReactions,
+      appOpens,
       window.startMs,
       window.endMs,
       dayKey,
