@@ -33,6 +33,7 @@ export type EarnedBadge = Achievement & {
   userId: string;
   key: string;
   detail?: string;
+  earnedAtMs?: number;
 };
 
 export type AchievementCtx = {
@@ -181,6 +182,8 @@ export function earnedForUser(
   const out: EarnedBadge[] = [];
   const wantLive = true;
   const wantEnd = phase === "final";
+
+  const userLatestMs = lastUserActivityMs(ctx, userId);
 
   const userDrinks = ctx.drinks.filter((d) => d.user_id === userId);
   const drinkCount = userDrinks.length;
@@ -721,7 +724,37 @@ export function earnedForUser(
     }
   }
 
+  // Stamp every badge with the user's most recent activity time as a default
+  // "earned at". Cheap and good enough for end-of-day badges; live badges that
+  // want a precise trigger time can set earnedAtMs themselves on `make()`.
+  if (userLatestMs !== null) {
+    for (const b of out) {
+      if (b.earnedAtMs === undefined) b.earnedAtMs = userLatestMs;
+    }
+  }
+
   return out;
+}
+
+function lastUserActivityMs(ctx: AchievementCtx, userId: string): number | null {
+  let max = -Infinity;
+  const consider = (iso: string | null | undefined) => {
+    if (!iso) return;
+    const t = new Date(iso).getTime();
+    if (Number.isFinite(t) && t > max) max = t;
+  };
+  for (const d of ctx.drinks) if (d.user_id === userId) consider(d.logged_at);
+  for (const r of ctx.voteResponses) if (r.user_id === userId) consider(r.updated_at);
+  for (const i of ctx.voteItems) if (i.proposer_id === userId) consider(i.created_at);
+  for (const s of ctx.gameScores) if (s.user_id === userId) consider(s.recorded_at);
+  for (const sp of ctx.spins) {
+    if (sp.spinner_id === userId || sp.winner_id === userId) consider(sp.created_at);
+  }
+  for (const p of ctx.photos) if (p.user_id === userId) consider(p.taken_at);
+  for (const r of ctx.itineraryReactions) if (r.user_id === userId) consider(r.created_at);
+  for (const e of ctx.itineraryEvents) if (e.created_by === userId) consider(e.created_at);
+  for (const o of ctx.appOpens) if (o.user_id === userId) consider(o.opened_at);
+  return max === -Infinity ? null : max;
 }
 
 type ActivityFlags = {

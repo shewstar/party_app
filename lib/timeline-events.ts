@@ -122,6 +122,19 @@ export function buildTimelineEvents(input: BuildInput): TimelineEvent[] {
   return list;
 }
 
+export function formatEarnedAt(ts: number, now: number): string {
+  const d = new Date(ts);
+  const today = new Date(now);
+  const sameDay =
+    d.getFullYear() === today.getFullYear() &&
+    d.getMonth() === today.getMonth() &&
+    d.getDate() === today.getDate();
+  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  if (sameDay) return time;
+  const date = d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+  return `${date} · ${time}`;
+}
+
 export function formatTimeAgo(ts: number, now: number): string {
   const diff = now - ts;
   const mins = Math.floor(diff / 60000);

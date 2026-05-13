@@ -1,5 +1,6 @@
 import clsx from "./clsx";
 import type { EarnedBadge, Tier } from "@/lib/achievements";
+import { formatEarnedAt } from "@/lib/timeline-events";
 
 const tierStyles: Record<Tier, string> = {
   win: "border-accent/40 bg-accentSoft text-ink",
@@ -36,9 +37,14 @@ export default function AchievementBadge({
         <div className={clsx("font-semibold truncate", compact ? "text-sm" : "text-base")}>
           {badge.title}
         </div>
-        <div className={clsx("text-muted truncate", compact ? "text-xs" : "text-sm")}>
-          {badge.detail ?? badge.blurb}
+        <div className={clsx("text-muted", compact ? "text-xs" : "text-sm")}>
+          {badge.blurb}
         </div>
+        {badge.earnedAtMs !== undefined && (
+          <div className={clsx("text-accent font-medium tabular-nums", compact ? "text-xs" : "text-sm")}>
+            {formatEarnedAt(badge.earnedAtMs, Date.now())}
+          </div>
+        )}
       </div>
       <span
         className={clsx(

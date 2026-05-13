@@ -19,6 +19,7 @@ import {
   type Achievement,
   type EarnedBadge,
 } from "@/lib/achievements";
+import { formatEarnedAt } from "@/lib/timeline-events";
 import { useUser } from "@/lib/user-context";
 import { useTableData } from "@/lib/realtime-provider";
 import type {
@@ -191,9 +192,12 @@ function Row({
         >
           {badge.title}
         </div>
-        <div className="text-xs text-muted truncate">
-          {got ? earned!.detail ?? badge.blurb : badge.blurb}
-        </div>
+        <div className="text-xs text-muted">{badge.blurb}</div>
+        {got && earned!.earnedAtMs !== undefined && (
+          <div className="text-xs text-accent font-medium tabular-nums">
+            {formatEarnedAt(earned!.earnedAtMs, Date.now())}
+          </div>
+        )}
       </div>
       <span
         className={clsx(
