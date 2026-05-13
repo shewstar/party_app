@@ -14,6 +14,8 @@ import { useHaptic } from "@/lib/haptics";
 import { useOnlineStatus } from "@/lib/offline-queue";
 import { useTableData, useRealtimeReady, useRefreshTable } from "@/lib/realtime-provider";
 import type { GameRow, GameTotalsRow, UserRow } from "@/lib/supabase/types";
+import FinskaBoard from "@/components/FinskaBoard";
+import { FINSKA } from "@/lib/finska";
 
 export default function GameDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -119,9 +121,10 @@ export default function GameDetailPage() {
     setShowAddPlayers(false);
   }
 
-  async function toggleFinished() {
+  async function toggleFinished(target?: boolean) {
     if (!game) return;
-    const next = !finished;
+    const next = target ?? !finished;
+    if (next === finished) return;
     setOptimisticFinished(next);
     await supabase().from("games").update({ finished: next }).eq("id", game.id);
     // Clear after realtime should have refreshed the games table.
@@ -140,6 +143,33 @@ export default function GameDetailPage() {
     );
   }
   const finished = optimisticFinished ?? game.finished;
+
+  if (game.preset === FINSKA.id) {
+    return (
+      <main className="flex-1 flex flex-col">
+        <TopBar title={game.name} />
+        <div className="px-5 pt-4 flex justify-between items-center">
+          {finished ? (
+            <span className="text-sm text-accent font-medium">✓ Finished</span>
+          ) : (
+            <span className="text-xs text-muted">Finska · first to 50</span>
+          )}
+          <button
+            type="button"
+            onClick={() => toggleFinished()}
+            className={`text-sm underline ${finished ? "text-muted" : "text-accent"}`}
+          >
+            {finished ? "Unfinish" : "Finish game"}
+          </button>
+        </div>
+        <FinskaBoard
+          game={game}
+          finished={finished}
+          onAutoFinish={() => toggleFinished(true)}
+        />
+      </main>
+    );
+  }
 
   const sorted = frozenOrder
     ? [
@@ -163,7 +193,7 @@ export default function GameDetailPage() {
 
         <button
           type="button"
-          onClick={toggleFinished}
+          onClick={() => toggleFinished()}
           className={`text-sm underline self-end ${finished ? "text-muted" : "text-accent"}`}
         >
           {finished ? "Unfinish" : "Finish game"}

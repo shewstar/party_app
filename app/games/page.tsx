@@ -10,7 +10,8 @@ import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
 import { SkeletonCard } from "@/components/Skeleton";
 import { useTableData } from "@/lib/realtime-provider";
-import type { GameRow, GameTotalsRow, UserRow } from "@/lib/supabase/types";
+import type { GamePreset, GameRow, GameTotalsRow, UserRow } from "@/lib/supabase/types";
+import { FINSKA, shuffle } from "@/lib/finska";
 
 type GameSummary = GameRow & { totals: GameTotalsRow[] };
 
@@ -68,6 +69,7 @@ export default function GamesPage() {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [preset, setPreset] = useState<GamePreset | null>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -88,17 +90,23 @@ export default function GamesPage() {
     const s = supabase();
     const { data, error } = await s
       .from("games")
-      .insert({ name: name.trim() })
+      .insert({ name: name.trim(), preset })
       .select()
       .single();
     if (error || !data) {
       alert(error?.message ?? "Failed to create game");
       return;
     }
-    const rows = Array.from(picked).map((uid) => ({ game_id: data.id, user_id: uid }));
+    const order = preset === FINSKA.id ? shuffle(Array.from(picked)) : Array.from(picked);
+    const rows = order.map((uid, i) => ({
+      game_id: data.id,
+      user_id: uid,
+      throw_order: preset === FINSKA.id ? i : null,
+    }));
     await s.from("game_players").insert(rows);
     setName("");
     setPicked(new Set());
+    setPreset(null);
     setCreating(false);
   }
 
@@ -126,12 +134,23 @@ export default function GamesPage() {
         {creating && (
           <Card>
             <form onSubmit={createGame} className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium">Preset</span>
+                <div className="flex flex-wrap gap-2">
+                  <Chip active={preset === null} onClick={() => setPreset(null)}>
+                    Generic
+                  </Chip>
+                  <Chip active={preset === FINSKA.id} onClick={() => setPreset(FINSKA.id)}>
+                    {FINSKA.label}
+                  </Chip>
+                </div>
+              </div>
               <label className="flex flex-col gap-1">
                 <span className="text-sm font-medium">Game name</span>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Beer pong, darts, pool…"
+                  placeholder={preset === FINSKA.id ? "Finska round 1…" : "Beer pong, darts, pool…"}
                   maxLength={40}
                   className="border border-line rounded-card px-3 py-2 bg-surface"
                 />
@@ -156,6 +175,7 @@ export default function GamesPage() {
                     setCreating(false);
                     setName("");
                     setPicked(new Set());
+                    setPreset(null);
                   }}
                   className="flex-1 rounded-card border border-line bg-surface py-2"
                 >
