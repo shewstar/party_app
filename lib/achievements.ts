@@ -134,7 +134,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   // Gold-tier drinks
   { id: "centurion", title: "Centurion", blurb: "20+ drinks in one night.", icon: "💯", tier: "win", timing: "live" },
   { id: "the-beast", title: "The Beast", blurb: "30+ drinks in one night.", icon: "🦏", tier: "win", timing: "live" },
-  { id: "strong-hand", title: "Strong Hand", blurb: "Avg ≥ 1.5 std drinks per drink (5+).", icon: "💪", tier: "win", timing: "live" },
+  { id: "strong-hand", title: "Strong Hand", blurb: "Avg ≥ 1.3 std drinks per drink (5+).", icon: "💪", tier: "win", timing: "live" },
   { id: "speed-demon", title: "Speed Demon", blurb: "8 drinks inside a 60-min window.", icon: "💨", tier: "win", timing: "live" },
   { id: "iron-liver", title: "Iron Liver", blurb: "Peak BAC over 0.20.", icon: "🛡️", tier: "win", timing: "endOfDay" },
 
@@ -156,11 +156,17 @@ export const ACHIEVEMENTS: Achievement[] = [
 
 const byId = new Map(ACHIEVEMENTS.map((a) => [a.id, a]));
 
-function make(id: string, userId: string, detail?: string, suffix?: string): EarnedBadge {
+function make(
+  id: string,
+  userId: string,
+  detail?: string,
+  suffix?: string,
+  at?: number,
+): EarnedBadge {
   const a = byId.get(id);
   if (!a) throw new Error(`Unknown achievement: ${id}`);
   const key = suffix ? `${id}:${suffix}` : id;
-  return { ...a, userId, key, detail };
+  return { ...a, userId, key, detail, earnedAtMs: at };
 }
 
 export function evaluateAchievements(
@@ -189,8 +195,10 @@ export function earnedForUser(
   const drinkCount = userDrinks.length;
   const totalStd = userDrinks.reduce((s, d) => s + Number(d.standard_drinks), 0);
   const userTimes = userDrinks.map((d) => new Date(d.logged_at).getTime());
+  const sortedDrinkTimes = [...userTimes].sort((a, b) => a - b);
   const firstDrinkMs = userTimes.length ? Math.min(...userTimes) : null;
   const lastDrinkMs = userTimes.length ? Math.max(...userTimes) : null;
+  const endOfPartyMs = lastDrinkMs ?? userLatestMs ?? ctx.windowEndMs;
 
   // ── DRINKS (live) ──────────────────────────────────────────────────────
   if (wantLive) {
@@ -199,92 +207,108 @@ export function earnedForUser(
         ...ctx.drinks.map((d) => new Date(d.logged_at).getTime()),
       );
       if (firstDrinkMs === earliest) {
-        out.push(make("quick-off-the-mark", userId, "first drink of the night"));
+        out.push(make("quick-off-the-mark", userId, "first drink of the night", undefined, firstDrinkMs));
       }
     }
     if (drinkCount >= 10) {
-      out.push(make("marathon-runner", userId, `${drinkCount} drinks`));
+      out.push(make("marathon-runner", userId, `${drinkCount} drinks`, undefined, sortedDrinkTimes[9]));
     }
     if (drinkCount >= 20) {
-      out.push(make("centurion", userId, `${drinkCount} drinks`));
+      out.push(make("centurion", userId, `${drinkCount} drinks`, undefined, sortedDrinkTimes[19]));
     }
     if (drinkCount >= 30) {
-      out.push(make("the-beast", userId, `${drinkCount} drinks`));
+      out.push(make("the-beast", userId, `${drinkCount} drinks`, undefined, sortedDrinkTimes[29]));
     }
-    if (drinkCount >= 5 && totalStd / drinkCount >= 1.5) {
-      out.push(make("strong-hand", userId, `${(totalStd / drinkCount).toFixed(2)} std avg`));
+    if (drinkCount >= 5 && totalStd / drinkCount >= 1.3) {
+      out.push(make("strong-hand", userId, `${(totalStd / drinkCount).toFixed(2)} std avg`, undefined, sortedDrinkTimes[4]));
     }
     const pace = fastestPace(userDrinks);
     if (pace >= 5) {
-      out.push(make("pacesetter", userId, `${pace} in 60 min`));
+      out.push(make("pacesetter", userId, `${pace} in 60 min`, undefined, lastDrinkMs ?? undefined));
     }
     if (pace >= 8) {
-      out.push(make("speed-demon", userId, `${pace} in 60 min`));
+      out.push(make("speed-demon", userId, `${pace} in 60 min`, undefined, lastDrinkMs ?? undefined));
     }
-    const cats = new Set(userDrinks.map((d) => d.category));
-    if (cats.size === 3) {
-      out.push(make("variety-pack", userId, "beer + wine + spirits"));
+    const seenCats = new Set<string>();
+    let varietyAtMs: number | undefined;
+    for (const d of userDrinks.slice().sort((a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime())) {
+      seenCats.add(d.category);
+      if (seenCats.size === 3) {
+        varietyAtMs = new Date(d.logged_at).getTime();
+        break;
+      }
     }
-    const hasAfter2 = userDrinks.some((d) => {
+    if (varietyAtMs !== undefined) {
+      out.push(make("variety-pack", userId, "beer + wine + spirits", undefined, varietyAtMs));
+    }
+    const after2Drink = userDrinks.find((d) => {
       const h = new Date(d.logged_at).getHours();
       return h >= 2 && h < 5;
     });
-    if (hasAfter2) out.push(make("night-owl", userId, "after 2am"));
+    if (after2Drink) {
+      out.push(make("night-owl", userId, "after 2am", undefined, new Date(after2Drink.logged_at).getTime()));
+    }
 
     if (firstDrinkMs !== null) {
       const h = new Date(firstDrinkMs).getHours();
       if (h >= 22 || h < 5) {
-        out.push(make("late-starter", userId, "first drink late"));
+        out.push(make("late-starter", userId, "first drink late", undefined, firstDrinkMs));
       }
     }
     const myLabels = new Set(
       userDrinks.map((d) => d.label).filter((l): l is string => !!l),
     );
     if (myLabels.size > 0) {
-      const matched = ctx.drinks.some(
-        (d) => d.user_id !== userId && d.label && myLabels.has(d.label),
+      const myMatchingDrinks = userDrinks.filter(
+        (d) => d.label && ctx.drinks.some((x) => x.user_id !== userId && x.label === d.label),
       );
-      if (matched) out.push(make("cheers-club", userId));
+      if (myMatchingDrinks.length > 0) {
+        const t = Math.max(...myMatchingDrinks.map((d) => new Date(d.logged_at).getTime()));
+        out.push(make("cheers-club", userId, undefined, undefined, t));
+      }
       const sharedLabels = new Set<string>();
       for (const lbl of myLabels) {
-        if (
-          ctx.drinks.some((d) => d.user_id !== userId && d.label === lbl)
-        ) {
+        if (ctx.drinks.some((d) => d.user_id !== userId && d.label === lbl)) {
           sharedLabels.add(lbl);
         }
       }
       if (sharedLabels.size >= 3) {
-        out.push(make("drinking-buddy", userId, `${sharedLabels.size} shared`));
+        out.push(make("drinking-buddy", userId, `${sharedLabels.size} shared`, undefined, lastDrinkMs ?? undefined));
       }
     }
     const SIXTY_SEC = 60 * 1000;
-    const inSync = userDrinks.some((my) => {
+    let inSyncAtMs: number | undefined;
+    for (const my of userDrinks) {
       const myT = new Date(my.logged_at).getTime();
-      return ctx.drinks.some(
+      const match = ctx.drinks.find(
         (d) =>
           d.user_id !== userId &&
           Math.abs(new Date(d.logged_at).getTime() - myT) <= SIXTY_SEC,
       );
-    });
-    if (inSync) out.push(make("in-sync", userId, "within 60s"));
-
-    const labelCounts = new Map<string, number>();
-    for (const d of userDrinks) {
-      if (d.label) {
-        labelCounts.set(d.label, (labelCounts.get(d.label) ?? 0) + 1);
+      if (match) {
+        inSyncAtMs = Math.max(inSyncAtMs ?? 0, myT);
       }
     }
-    for (const [lbl, cnt] of labelCounts) {
-      if (cnt >= 3) {
-        out.push(make("creature-of-habit", userId, `${lbl} ×${cnt}`));
+    if (inSyncAtMs !== undefined) out.push(make("in-sync", userId, "within 60s", undefined, inSyncAtMs));
+
+    const labelCountsMap = new Map<string, { count: number; thirdAt?: number }>();
+    for (const d of userDrinks.slice().sort((a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime())) {
+      if (!d.label) continue;
+      const entry = labelCountsMap.get(d.label) ?? { count: 0 };
+      entry.count++;
+      if (entry.count === 3) entry.thirdAt = new Date(d.logged_at).getTime();
+      labelCountsMap.set(d.label, entry);
+    }
+    for (const [lbl, info] of labelCountsMap) {
+      if (info.count >= 3) {
+        out.push(make("creature-of-habit", userId, `${lbl} ×${info.count}`, undefined, info.thirdAt));
         break;
       }
     }
 
-    const sorted = [...userTimes].sort((a, b) => a - b);
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i] - sorted[i - 1] <= 5 * 60 * 1000) {
-        out.push(make("double-down", userId, `≤5 min apart`));
+    for (let i = 1; i < sortedDrinkTimes.length; i++) {
+      if (sortedDrinkTimes[i] - sortedDrinkTimes[i - 1] <= 5 * 60 * 1000) {
+        out.push(make("double-down", userId, `≤5 min apart`, undefined, sortedDrinkTimes[i]));
         break;
       }
     }
@@ -301,7 +325,7 @@ export function earnedForUser(
     }
     const topStd = [...stdByUser.entries()].sort((a, b) => b[1] - a[1])[0];
     if (topStd && topStd[0] === userId && topStd[1] > 0) {
-      out.push(make("heavyweight", userId, `${topStd[1].toFixed(1)} std`));
+      out.push(make("heavyweight", userId, `${topStd[1].toFixed(1)} std`, undefined, endOfPartyMs));
     }
 
     const user = ctx.users.find((u) => u.id === userId);
@@ -321,29 +345,29 @@ export function earnedForUser(
         }
       }
       if (topUserId === userId && me.status === "ok" && me.value > 0) {
-        out.push(make("peak-performer", userId, me.value.toFixed(3)));
+        out.push(make("peak-performer", userId, me.value.toFixed(3), undefined, me.atMs ?? endOfPartyMs));
       }
       if (me.status === "ok" && me.value > 0.2) {
-        out.push(make("iron-liver", userId, me.value.toFixed(3)));
+        out.push(make("iron-liver", userId, me.value.toFixed(3), undefined, me.atMs ?? endOfPartyMs));
       }
     }
 
     if (drinkCount === 1 || drinkCount === 2) {
-      out.push(make("pacing-yourself", userId, `${drinkCount} drink${drinkCount === 1 ? "" : "s"}`));
+      out.push(make("pacing-yourself", userId, `${drinkCount} drink${drinkCount === 1 ? "" : "s"}`, undefined, endOfPartyMs));
     }
     // Designated Survivor + No Show distinguish: Survivor = did SOMETHING but no drinks.
     // No Show handled in cross-feature.
     const didSomethingNonDrink = activityFlags(ctx, userId).nonDrink;
     if (drinkCount === 0 && didSomethingNonDrink) {
-      out.push(make("designated-survivor", userId));
+      out.push(make("designated-survivor", userId, undefined, undefined, endOfPartyMs));
     }
     if (drinkCount === 1 && firstDrinkMs !== null) {
       const h = new Date(firstDrinkMs).getHours();
       const earlyHour = h >= 5 && h < 21;
-      if (earlyHour) out.push(make("one-and-done", userId, "before 9pm"));
+      if (earlyHour) out.push(make("one-and-done", userId, "before 9pm", undefined, firstDrinkMs));
     }
     if (drinkCount >= 3 && userDrinks.every((d) => Number(d.abv) < 0.04)) {
-      out.push(make("light-touch", userId, "all <4% abv"));
+      out.push(make("light-touch", userId, "all <4% abv", undefined, lastDrinkMs ?? undefined));
     }
     if (drinkCount >= 1 && ctx.drinks.length >= 2 && firstDrinkMs !== null && lastDrinkMs !== null) {
       const allTimes = ctx.drinks.map((d) => new Date(d.logged_at).getTime());
@@ -354,24 +378,43 @@ export function earnedForUser(
         lastDrinkMs === latestAll &&
         earliestAll !== latestAll
       ) {
-        out.push(make("bookends", userId, "first & last"));
+        out.push(make("bookends", userId, "first & last", undefined, lastDrinkMs));
       }
     }
   }
 
   // ── VOTES ──────────────────────────────────────────────────────────────
   const myProposals = ctx.voteItems.filter((i) => i.proposer_id === userId);
+  const myProposalTimes = myProposals
+    .map((p) => new Date(p.created_at).getTime())
+    .sort((a, b) => a - b);
   const myTally = ctx.voteTally.filter((t) =>
     myProposals.some((p) => p.id === t.id),
   );
   const myResponses = ctx.voteResponses.filter((r) => r.user_id === userId);
+  const myResponseTimes = myResponses
+    .map((r) => new Date(r.updated_at).getTime())
+    .sort((a, b) => a - b);
+  const lastResponseMs = myResponseTimes.length ? myResponseTimes[myResponseTimes.length - 1] : undefined;
+  const lastProposalMs = myProposalTimes.length ? myProposalTimes[myProposalTimes.length - 1] : undefined;
+  // Latest activity in the votes domain (proposed or responded).
+  const lastVoteActivityMs = (() => {
+    const candidates = [lastResponseMs, lastProposalMs].filter((x): x is number => x !== undefined);
+    return candidates.length ? Math.max(...candidates) : undefined;
+  })();
+  function tallyResponseMs(itemId: string, predicate: (v: 1 | -1) => boolean): number | undefined {
+    const ts = ctx.voteResponses
+      .filter((r) => r.vote_item_id === itemId && predicate(r.value))
+      .map((r) => new Date(r.updated_at).getTime());
+    return ts.length ? Math.max(...ts) : undefined;
+  }
   if (wantLive) {
     if (myProposals.length >= 3) {
-      out.push(make("activist", userId, `${myProposals.length} proposals`));
+      out.push(make("activist", userId, `${myProposals.length} proposals`, undefined, myProposalTimes[2]));
     }
     for (const t of myTally) {
       if (t.net >= 3 && t.against_count === 0) {
-        out.push(make("landslide", userId, `+${t.net}`, t.id));
+        out.push(make("landslide", userId, `+${t.net}`, t.id, tallyResponseMs(t.id, () => true) ?? lastVoteActivityMs));
         break;
       }
     }
@@ -379,27 +422,31 @@ export function earnedForUser(
   if (wantEnd) {
     if (myTally.some((t) => t.net > 0)) {
       const best = myTally.reduce((a, b) => (a.net >= b.net ? a : b));
-      out.push(make("rule-maker", userId, `+${best.net}`));
+      out.push(make("rule-maker", userId, `+${best.net}`, undefined, tallyResponseMs(best.id, () => true) ?? endOfPartyMs));
     }
     if (myProposals.length >= 10) {
-      out.push(make("visionary", userId, `${myProposals.length} proposals`));
+      out.push(make("visionary", userId, `${myProposals.length} proposals`, undefined, myProposalTimes[9]));
     }
     if (myTally.some((t) => t.net < 0)) {
       const worst = myTally.reduce((a, b) => (a.net <= b.net ? a : b));
-      out.push(make("sad-trombone", userId, `${worst.net}`));
+      out.push(make("sad-trombone", userId, `${worst.net}`, undefined, tallyResponseMs(worst.id, () => true) ?? endOfPartyMs));
     }
     if (ctx.voteItems.length > 0) {
       if (myResponses.length === ctx.voteItems.length && myResponses.length > 0) {
-        out.push(make("democracy", userId, `voted ${myResponses.length}/${ctx.voteItems.length}`));
+        out.push(make("democracy", userId, `voted ${myResponses.length}/${ctx.voteItems.length}`, undefined, lastResponseMs ?? endOfPartyMs));
       }
       if (myResponses.length === 0) {
-        out.push(make("wallflower", userId));
+        out.push(make("wallflower", userId, undefined, undefined, endOfPartyMs));
       }
     }
     const forCount = myResponses.filter((r) => r.value === 1).length;
     const againstCount = myResponses.filter((r) => r.value === -1).length;
     if (againstCount > forCount && againstCount >= 2) {
-      out.push(make("naysayer", userId, `${againstCount} against`));
+      const lastAgainst = myResponses
+        .filter((r) => r.value === -1)
+        .map((r) => new Date(r.updated_at).getTime())
+        .sort((a, b) => a - b);
+      out.push(make("naysayer", userId, `${againstCount} against`, undefined, lastAgainst[lastAgainst.length - 1] ?? endOfPartyMs));
     }
   }
 
@@ -407,12 +454,35 @@ export function earnedForUser(
   const myGames = ctx.gamePlayers.filter((gp) => gp.user_id === userId);
   const myGameIds = new Set(myGames.map((g) => g.game_id));
   const myGameTotals = ctx.gameTotals.filter((t) => t.user_id === userId);
+  // Earliest moment each of the user's games "started" for them: their first
+  // score in it, or the game's created_at as a fallback.
+  function gameStartForMe(gameId: string): number {
+    const myScores = ctx.gameScores
+      .filter((s) => s.game_id === gameId && s.user_id === userId)
+      .map((s) => new Date(s.recorded_at).getTime());
+    if (myScores.length) return Math.min(...myScores);
+    const game = ctx.games.find((g) => g.id === gameId);
+    return game ? new Date(game.created_at).getTime() : (userLatestMs ?? ctx.windowEndMs);
+  }
+  function gameLastActivityMs(gameId: string): number {
+    const scores = ctx.gameScores
+      .filter((s) => s.game_id === gameId)
+      .map((s) => new Date(s.recorded_at).getTime());
+    if (scores.length) return Math.max(...scores);
+    const game = ctx.games.find((g) => g.id === gameId);
+    return game ? new Date(game.created_at).getTime() : (userLatestMs ?? ctx.windowEndMs);
+  }
+  const myGameStartTimes = [...myGameIds].map(gameStartForMe).sort((a, b) => a - b);
+  const lastGameActivityForMe = (() => {
+    const ts = [...myGameIds].map(gameLastActivityMs);
+    return ts.length ? Math.max(...ts) : undefined;
+  })();
   if (wantLive) {
     if (myGames.length >= 3) {
-      out.push(make("triathlete", userId, `${myGames.length} games`));
+      out.push(make("triathlete", userId, `${myGames.length} games`, undefined, myGameStartTimes[2]));
     }
     if (myGames.length >= 10) {
-      out.push(make("gauntlet", userId, `${myGames.length} games`));
+      out.push(make("gauntlet", userId, `${myGames.length} games`, undefined, myGameStartTimes[9]));
     }
     // Clutch — leading by exactly 1 in any game
     for (const gameId of myGameIds) {
@@ -425,11 +495,12 @@ export function earnedForUser(
         sorted[0].user_id === userId &&
         Number(sorted[0].total_score) - Number(sorted[1].total_score) === 1
       ) {
-        out.push(make("clutch", userId, "leading by 1", gameId));
+        out.push(make("clutch", userId, "leading by 1", gameId, gameLastActivityMs(gameId)));
       }
     }
-    if (myGameTotals.some((t) => Number(t.total_score) < 0)) {
-      out.push(make("net-negative", userId));
+    const negative = myGameTotals.find((t) => Number(t.total_score) < 0);
+    if (negative) {
+      out.push(make("net-negative", userId, undefined, undefined, gameLastActivityMs(negative.game_id)));
     }
   }
   if (wantEnd) {
@@ -442,15 +513,19 @@ export function earnedForUser(
     const myFinishedGameIds = new Set(
       [...myGameIds].filter((id) => finishedGameIds.has(id)),
     );
+    const lastFinishedGameMs = (() => {
+      const ts = [...finishedGameIds].map(gameLastActivityMs);
+      return ts.length ? Math.max(...ts) : endOfPartyMs;
+    })();
 
     const wins = gameWinsByUser(finishedTotals);
     const myWins = wins.find((r) => r.user_id === userId);
     const topWins = [...wins].sort((a, b) => b.wins - a.wins || b.total - a.total)[0];
     if (topWins && topWins.user_id === userId && topWins.wins > 0) {
-      out.push(make("game-champion", userId, `${topWins.wins} W`));
+      out.push(make("game-champion", userId, `${topWins.wins} W`, undefined, lastFinishedGameMs));
     }
     if (myWins && myWins.wins >= 5) {
-      out.push(make("dynasty", userId, `${myWins.wins} W`));
+      out.push(make("dynasty", userId, `${myWins.wins} W`, undefined, lastFinishedGameMs));
     }
     if (myFinishedGameIds.size >= 2) {
       const wonAll = [...myFinishedGameIds].every((gameId) => {
@@ -461,7 +536,7 @@ export function earnedForUser(
         )[0];
         return top.user_id === userId && Number(top.total_score) > 0;
       });
-      if (wonAll) out.push(make("sweeper", userId, `${myFinishedGameIds.size} games`));
+      if (wonAll) out.push(make("sweeper", userId, `${myFinishedGameIds.size} games`, undefined, lastFinishedGameMs));
     }
     for (const gameId of myFinishedGameIds) {
       const totals = finishedTotals.filter((t) => t.game_id === gameId);
@@ -470,7 +545,7 @@ export function earnedForUser(
         (a, b) => Number(a.total_score) - Number(b.total_score),
       );
       if (sorted[0].user_id === userId && Number(sorted[0].total_score) <= 0) {
-        out.push(make("wooden-spoon", userId, "last place", gameId));
+        out.push(make("wooden-spoon", userId, "last place", gameId, gameLastActivityMs(gameId)));
         break;
       }
     }
@@ -479,7 +554,7 @@ export function earnedForUser(
       if (Number(t.total_score) === 0) {
         const totals = finishedTotals.filter((x) => x.game_id === t.game_id);
         if (totals.length >= 2) {
-          out.push(make("bagel", userId, "0 pts", t.game_id));
+          out.push(make("bagel", userId, "0 pts", t.game_id, gameLastActivityMs(t.game_id)));
           break;
         }
       }
@@ -500,6 +575,7 @@ export function earnedForUser(
             userId,
             `+${Number(sorted[0].total_score) - Number(sorted[1].total_score)}`,
             gameId,
+            gameLastActivityMs(gameId),
           ),
         );
         break;
@@ -512,69 +588,107 @@ export function earnedForUser(
 
   // ── SPIN ───────────────────────────────────────────────────────────────
   const wonSpins = ctx.spins.filter((s) => s.winner_id === userId);
+  const wonSpinTimes = wonSpins.map((s) => new Date(s.created_at).getTime()).sort((a, b) => a - b);
   const spunByMe = ctx.spins.filter((s) => s.spinner_id === userId);
+  const spunByMeTimes = spunByMe.map((s) => new Date(s.created_at).getTime()).sort((a, b) => a - b);
   const pooledSpins = ctx.spins.filter((s) => s.pool.includes(userId));
+  const pooledSpinTimes = pooledSpins.map((s) => new Date(s.created_at).getTime()).sort((a, b) => a - b);
+  const lastPooledMs = pooledSpinTimes.length ? pooledSpinTimes[pooledSpinTimes.length - 1] : undefined;
   if (wantLive) {
     if (wonSpins.length >= 1) {
-      out.push(make("chosen-one", userId));
+      out.push(make("chosen-one", userId, undefined, undefined, wonSpinTimes[0]));
     }
     if (wonSpins.length >= 3) {
-      out.push(make("magnet", userId, `${wonSpins.length}× picked`));
+      out.push(make("magnet", userId, `${wonSpins.length}× picked`, undefined, wonSpinTimes[2]));
     }
     if (wonSpins.length >= 5) {
-      out.push(make("four-leaf", userId, `${wonSpins.length}× picked`));
+      out.push(make("four-leaf", userId, `${wonSpins.length}× picked`, undefined, wonSpinTimes[4]));
     }
-    const bigPoolWins = wonSpins.filter((s) => s.pool.length > 4).length;
-    if (bigPoolWins >= 10) {
-      out.push(make("stacked-odds", userId, `${bigPoolWins}× in 5+ pools`));
+    const bigPoolWinsArr = wonSpins
+      .filter((s) => s.pool.length > 4)
+      .map((s) => new Date(s.created_at).getTime())
+      .sort((a, b) => a - b);
+    if (bigPoolWinsArr.length >= 10) {
+      out.push(make("stacked-odds", userId, `${bigPoolWinsArr.length}× in 5+ pools`, undefined, bigPoolWinsArr[9]));
     }
     if (spunByMe.length >= 5) {
-      out.push(make("spinmeister", userId, `${spunByMe.length} spins`));
+      out.push(make("spinmeister", userId, `${spunByMe.length} spins`, undefined, spunByMeTimes[4]));
     }
   }
   if (wantEnd) {
     if (pooledSpins.length >= 5 && wonSpins.length === 0) {
-      out.push(make("ghosted", userId, `${pooledSpins.length} pools, 0 picks`));
+      out.push(make("ghosted", userId, `${pooledSpins.length} pools, 0 picks`, undefined, lastPooledMs ?? endOfPartyMs));
     }
   }
 
   // ── CAMERA ─────────────────────────────────────────────────────────────
   const myPhotos = ctx.photos.filter((p) => p.user_id === userId);
-  const warmCount = myPhotos.filter((p) => p.filter_variant === "warm").length;
-  const coolCount = myPhotos.filter((p) => p.filter_variant === "cool").length;
+  const myPhotoTimes = myPhotos.map((p) => new Date(p.taken_at).getTime()).sort((a, b) => a - b);
+  const lastPhotoMs = myPhotoTimes.length ? myPhotoTimes[myPhotoTimes.length - 1] : undefined;
+  const warmPhotos = myPhotos.filter((p) => p.filter_variant === "warm");
+  const coolPhotos = myPhotos.filter((p) => p.filter_variant === "cool");
+  const warmCount = warmPhotos.length;
+  const coolCount = coolPhotos.length;
   if (wantLive) {
-    if (myPhotos.length >= 1) out.push(make("film-loaded", userId));
-    if (myPhotos.length >= 3) out.push(make("shutterbug", userId, "3/3 shots"));
+    if (myPhotos.length >= 1) out.push(make("film-loaded", userId, undefined, undefined, myPhotoTimes[0]));
+    if (myPhotos.length >= 3) out.push(make("shutterbug", userId, "3/3 shots", undefined, myPhotoTimes[2]));
     if (warmCount > 0 && coolCount > 0) {
-      out.push(make("both-filters", userId));
+      const firstWarm = Math.min(...warmPhotos.map((p) => new Date(p.taken_at).getTime()));
+      const firstCool = Math.min(...coolPhotos.map((p) => new Date(p.taken_at).getTime()));
+      out.push(make("both-filters", userId, undefined, undefined, Math.max(firstWarm, firstCool)));
     }
   }
   if (wantEnd) {
     if (myPhotos.length > 0 && coolCount === myPhotos.length) {
-      out.push(make("cool-eye", userId, `${coolCount} cool`));
+      out.push(make("cool-eye", userId, `${coolCount} cool`, undefined, lastPhotoMs));
     }
     if (myPhotos.length > 0 && warmCount === myPhotos.length) {
-      out.push(make("warm-eye", userId, `${warmCount} warm`));
+      out.push(make("warm-eye", userId, `${warmCount} warm`, undefined, lastPhotoMs));
     }
     const flags = activityFlags(ctx, userId);
     if (myPhotos.length === 0 && (flags.drank || flags.voted || flags.played)) {
-      out.push(make("no-pic-no-proof", userId));
+      out.push(make("no-pic-no-proof", userId, undefined, undefined, endOfPartyMs));
     }
   }
 
   // ── ITINERARY ──────────────────────────────────────────────────────────
   const myReactions = ctx.itineraryReactions.filter((r) => r.user_id === userId);
+  const myReactionTimes = myReactions.map((r) => new Date(r.created_at).getTime()).sort((a, b) => a - b);
+  const lastReactionMs = myReactionTimes.length ? myReactionTimes[myReactionTimes.length - 1] : undefined;
   if (wantLive) {
-    const reactedEventIds = new Set(myReactions.map((r) => r.event_id));
-    if (reactedEventIds.size >= 3) {
-      out.push(make("hype-buck", userId, `${reactedEventIds.size} events`));
+    // Time when the user first reached the 3-distinct-event threshold.
+    const seenEvents = new Set<string>();
+    let hypeAtMs: number | undefined;
+    for (const r of myReactions.slice().sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())) {
+      if (!seenEvents.has(r.event_id)) {
+        seenEvents.add(r.event_id);
+        if (seenEvents.size === 3) {
+          hypeAtMs = new Date(r.created_at).getTime();
+          break;
+        }
+      }
     }
-    if (myReactions.some((r) => r.reaction === "💀")) {
-      out.push(make("doom-buck", userId));
+    if (hypeAtMs !== undefined) {
+      out.push(make("hype-buck", userId, `${seenEvents.size} events`, undefined, hypeAtMs));
     }
-    const distinctEmoji = new Set(myReactions.map((r) => r.reaction));
-    if (distinctEmoji.size >= 6) {
-      out.push(make("reaction-czar", userId, `${distinctEmoji.size} emoji`));
+    const doomReaction = myReactions.find((r) => r.reaction === "💀");
+    if (doomReaction) {
+      out.push(make("doom-buck", userId, undefined, undefined, new Date(doomReaction.created_at).getTime()));
+    }
+    // Time when 6th distinct emoji was first used.
+    const seenEmoji = new Set<string>();
+    let czarAtMs: number | undefined;
+    for (const r of myReactions.slice().sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())) {
+      if (!seenEmoji.has(r.reaction)) {
+        seenEmoji.add(r.reaction);
+        if (seenEmoji.size === 6) {
+          czarAtMs = new Date(r.created_at).getTime();
+          break;
+        }
+      }
+    }
+    if (czarAtMs !== undefined) {
+      out.push(make("reaction-czar", userId, `${seenEmoji.size} emoji`, undefined, czarAtMs));
     }
     for (const evt of ctx.itineraryEvents) {
       const evtReactions = ctx.itineraryReactions.filter(
@@ -586,18 +700,20 @@ export function earnedForUser(
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
       );
       if (sorted[0].user_id === userId) {
-        out.push(make("trendsetter", userId, "first react", evt.id));
+        out.push(make("trendsetter", userId, "first react", evt.id, new Date(sorted[0].created_at).getTime()));
       }
     }
     const TEN_MIN = 10 * 60 * 1000;
-    const punctual = myReactions.some((r) => {
+    const punctualReaction = myReactions.find((r) => {
       const evt = ctx.itineraryEvents.find((e) => e.id === r.event_id);
       if (!evt) return false;
       const delta =
         new Date(r.created_at).getTime() - new Date(evt.created_at).getTime();
       return delta >= 0 && delta <= TEN_MIN;
     });
-    if (punctual) out.push(make("punctual", userId, "<10 min"));
+    if (punctualReaction) {
+      out.push(make("punctual", userId, "<10 min", undefined, new Date(punctualReaction.created_at).getTime()));
+    }
   }
   if (wantEnd) {
     if (ctx.itineraryEvents.length >= 2) {
@@ -606,13 +722,14 @@ export function earnedForUser(
         reactedEventIds.has(evt.id),
       );
       if (reactedAll) {
-        out.push(make("hyped-up", userId, `${ctx.itineraryEvents.length}/${ctx.itineraryEvents.length}`));
+        out.push(make("hyped-up", userId, `${ctx.itineraryEvents.length}/${ctx.itineraryEvents.length}`, undefined, lastReactionMs ?? endOfPartyMs));
       }
     }
   }
 
   // ── APP OPENS ──────────────────────────────────────────────────────────
   const myOpens = ctx.appOpens.filter((o) => o.user_id === userId);
+  const myOpenTimes = myOpens.map((o) => new Date(o.opened_at).getTime()).sort((a, b) => a - b);
   if (wantLive) {
     if (ctx.appOpens.length > 0) {
       const earliest = [...ctx.appOpens].sort(
@@ -620,14 +737,14 @@ export function earnedForUser(
           new Date(a.opened_at).getTime() - new Date(b.opened_at).getTime(),
       )[0];
       if (earliest.user_id === userId) {
-        out.push(make("early-bird", userId, "first open"));
+        out.push(make("early-bird", userId, "first open", undefined, new Date(earliest.opened_at).getTime()));
       }
     }
     if (myOpens.length >= 10) {
-      out.push(make("refresher", userId, `${myOpens.length} opens`));
+      out.push(make("refresher", userId, `${myOpens.length} opens`, undefined, myOpenTimes[9]));
     }
     if (myOpens.length >= 100) {
-      out.push(make("locked-in", userId, `${myOpens.length} opens`));
+      out.push(make("locked-in", userId, `${myOpens.length} opens`, undefined, myOpenTimes[99]));
     }
   }
   if (wantEnd) {
@@ -638,7 +755,7 @@ export function earnedForUser(
           new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime(),
       )[0];
       if (latest.user_id === userId) {
-        out.push(make("last-light", userId, "last open"));
+        out.push(make("last-light", userId, "last open", undefined, new Date(latest.opened_at).getTime()));
       }
     }
   }
@@ -647,7 +764,7 @@ export function earnedForUser(
   const flags = activityFlags(ctx, userId);
   if (wantLive) {
     if (flags.drank && flags.voted && flags.played && flags.photographed) {
-      out.push(make("renaissance-buck", userId));
+      out.push(make("renaissance-buck", userId, undefined, undefined, userLatestMs ?? undefined));
     }
     const user = ctx.users.find((u) => u.id === userId);
     if (user && userDrinks.length > 0) {
@@ -662,7 +779,7 @@ export function earnedForUser(
         return top.user_id === userId && Number(top.total_score) > 0;
       });
       if (p.status === "ok" && p.value > 0.1 && leadingAGame) {
-        out.push(make("hot-streak", userId, p.value.toFixed(3)));
+        out.push(make("hot-streak", userId, p.value.toFixed(3), undefined, lastGameActivityForMe ?? lastDrinkMs ?? undefined));
       }
     }
   }
@@ -674,7 +791,7 @@ export function earnedForUser(
       myIds.has("game-champion") &&
       myIds.has("rule-maker")
     ) {
-      out.push(make("triple-crown", userId));
+      out.push(make("triple-crown", userId, undefined, undefined, endOfPartyMs));
     }
     // Iron Man — composite of three gold-tier badges (mirrors Triple Crown)
     if (
@@ -682,7 +799,7 @@ export function earnedForUser(
       myIds.has("iron-liver") &&
       myIds.has("dynasty")
     ) {
-      out.push(make("iron-man", userId));
+      out.push(make("iron-man", userId, undefined, undefined, endOfPartyMs));
     }
     // Ice Cold — won at least 1 finished game but no/zero BAC
     const user = ctx.users.find((u) => u.id === userId);
@@ -695,12 +812,12 @@ export function earnedForUser(
     const wins = gameWinsByUser(finishedTotals).find((r) => r.user_id === userId);
     if (user && wins && wins.wins > 0) {
       if (userDrinks.length === 0) {
-        out.push(make("ice-cold", userId, "0 drinks"));
+        out.push(make("ice-cold", userId, "0 drinks", undefined, endOfPartyMs));
       } else {
         const ss = Math.min(...userTimes);
         const p = peakBAC(user, userDrinks, ss);
         if (p.status === "ok" && p.value === 0) {
-          out.push(make("ice-cold", userId, "BAC 0.000"));
+          out.push(make("ice-cold", userId, "BAC 0.000", undefined, endOfPartyMs));
         }
       }
     }
@@ -719,7 +836,7 @@ export function earnedForUser(
         !flags.spun &&
         !flags.pooled
       ) {
-        out.push(make("no-show", userId));
+        out.push(make("no-show", userId, undefined, undefined, ctx.windowEndMs));
       }
     }
   }
