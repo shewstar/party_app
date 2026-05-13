@@ -41,6 +41,7 @@ export type VoteResponseRow = {
 export type GameRow = {
   id: string;
   name: string;
+  finished: boolean;
   created_at: string;
 };
 

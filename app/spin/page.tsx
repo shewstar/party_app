@@ -22,7 +22,7 @@ const WHEEL_COLORS = [
 ];
 
 const R = 180;
-const SPIN_MS = 8000;
+const SPIN_MS = 11000;
 const FULL_SPINS = 10;
 
 function polar(angleDeg: number, radius: number) {
@@ -52,6 +52,7 @@ export default function SpinPage() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [winner, setWinner] = useState<UserRow | null>(null);
   const initialisedRef = useRef(false);
 
@@ -113,6 +114,7 @@ export default function SpinPage() {
 
   function spin() {
     if (spinning || pool.length < 2) return;
+    setPickerOpen(false);
     const winnerIdx = Math.floor(Math.random() * pool.length);
     const sliceDeg = 360 / pool.length;
     const targetOffset = (360 - (winnerIdx + 0.5) * sliceDeg) % 360;
@@ -138,49 +140,61 @@ export default function SpinPage() {
   }
 
   const n = pool.length;
-  const labelFontSize = n > 10 ? 10 : n > 6 ? 12 : 14;
-  const avatarR = n > 10 ? 24 : n > 6 ? 36 : 50;
+  const labelFontSize = n > 10 ? 13 : n > 6 ? 14 : 14;
+  const avatarR = n > 10 ? 32 : n > 6 ? 37 : 40;
 
   return (
     <main className="flex-1 flex flex-col">
       <TopBar title="Spin" />
       <div className="px-5 py-4 flex flex-col gap-5">
         <Card>
-          <div className="flex items-baseline justify-between mb-2">
+          <button
+            type="button"
+            onClick={() => setPickerOpen(!pickerOpen)}
+            className="flex items-baseline justify-between w-full"
+          >
             <span className="text-sm font-medium">Who&apos;s in?</span>
-            <div className="flex gap-3 text-xs">
-              <button
-                type="button"
-                onClick={selectAll}
-                className="text-accent underline disabled:opacity-50"
-                disabled={spinning}
-              >
-                Select all
-              </button>
-              <button
-                type="button"
-                onClick={clearAll}
-                className="text-muted underline disabled:opacity-50"
-                disabled={spinning}
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {members.map((m) => (
-              <Chip
-                key={m.id}
-                active={picked.has(m.id)}
-                onClick={() => togglePick(m.id)}
-              >
-                {m.name}
-              </Chip>
-            ))}
-            {members.length === 0 && (
-              <span className="text-sm text-muted">No party members yet.</span>
-            )}
-          </div>
+            <span className="text-xs text-muted">
+              {pool.length} / {members.length}
+              {pickerOpen ? " ▲" : " ▼"}
+            </span>
+          </button>
+          {pickerOpen && (
+            <>
+              <div className="flex gap-3 text-xs mt-2">
+                <button
+                  type="button"
+                  onClick={selectAll}
+                  className="text-accent underline disabled:opacity-50"
+                  disabled={spinning}
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="text-muted underline disabled:opacity-50"
+                  disabled={spinning}
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {members.map((m) => (
+                  <Chip
+                    key={m.id}
+                    active={picked.has(m.id)}
+                    onClick={() => togglePick(m.id)}
+                  >
+                    {m.name}
+                  </Chip>
+                ))}
+                {members.length === 0 && (
+                  <span className="text-sm text-muted">No party members yet.</span>
+                )}
+              </div>
+            </>
+          )}
         </Card>
 
         <div className="flex items-center justify-center py-2">
@@ -253,8 +267,8 @@ export default function SpinPage() {
                     const start = (i / n) * 360;
                     const end = ((i + 1) / n) * 360;
                     const mid = (start + end) / 2;
-                    const avatarPos = polar(mid, R * 0.5);
-                    const labelPos = polar(mid, R * 0.91);
+                    const avatarPos = polar(mid, R * 0.78);
+                    const labelPos = polar(mid, R * 0.38);
                     return (
                       <g key={m.id}>
                         <path
@@ -274,45 +288,49 @@ export default function SpinPage() {
                                 />
                               </clipPath>
                             </defs>
-                            <image
-                              href={m.avatar_url}
-                              x={avatarPos.x - avatarR}
-                              y={avatarPos.y - avatarR}
-                              width={avatarR * 2}
-                              height={avatarR * 2}
-                              clipPath={`url(#avclip-${m.id})`}
-                              preserveAspectRatio="xMidYMid slice"
-                            />
-                            <circle
-                              cx={avatarPos.x}
-                              cy={avatarPos.y}
-                              r={avatarR}
-                              fill="none"
-                              stroke="white"
-                              strokeWidth={1.5}
-                            />
+                             <g transform={`rotate(${mid} ${avatarPos.x} ${avatarPos.y})`}>
+                              <image
+                                href={m.avatar_url}
+                                x={avatarPos.x - avatarR}
+                                y={avatarPos.y - avatarR}
+                                width={avatarR * 2}
+                                height={avatarR * 2}
+                                clipPath={`url(#avclip-${m.id})`}
+                                preserveAspectRatio="xMidYMid slice"
+                              />
+                              <circle
+                                cx={avatarPos.x}
+                                cy={avatarPos.y}
+                                r={avatarR}
+                                fill="none"
+                                stroke="white"
+                                strokeWidth={1.5}
+                              />
+                            </g>
                           </>
                         ) : (
                           <>
-                            <circle
-                              cx={avatarPos.x}
-                              cy={avatarPos.y}
-                              r={avatarR}
-                              fill="rgba(255,255,255,0.22)"
-                              stroke="white"
-                              strokeWidth={1.5}
-                            />
-                            <text
-                              x={avatarPos.x}
-                              y={avatarPos.y}
-                              fill="white"
-                              fontSize={avatarR * 0.85}
-                              fontWeight={700}
-                              textAnchor="middle"
-                              dominantBaseline="central"
-                            >
-                              {initialsOf(m.name) || "?"}
-                            </text>
+                            <g transform={`rotate(${mid} ${avatarPos.x} ${avatarPos.y})`}>
+                              <circle
+                                cx={avatarPos.x}
+                                cy={avatarPos.y}
+                                r={avatarR}
+                                fill="rgba(255,255,255,0.22)"
+                                stroke="white"
+                                strokeWidth={1.5}
+                              />
+                              <text
+                                x={avatarPos.x}
+                                y={avatarPos.y}
+                                fill="white"
+                                fontSize={avatarR * 0.85}
+                                fontWeight={700}
+                                textAnchor="middle"
+                                dominantBaseline="central"
+                              >
+                                {initialsOf(m.name) || "?"}
+                              </text>
+                            </g>
                           </>
                         )}
                         <text
@@ -323,7 +341,7 @@ export default function SpinPage() {
                           fontWeight={600}
                           textAnchor="middle"
                           dominantBaseline="middle"
-                          transform={`rotate(${mid} ${labelPos.x} ${labelPos.y})`}
+                          transform={`rotate(${mid - 90} ${labelPos.x} ${labelPos.y})`}
                         >
                           {m.name.slice(0, 10)}
                         </text>

@@ -117,6 +117,13 @@ export default function GameDetailPage() {
     setShowAddPlayers(false);
   }
 
+  async function toggleFinished() {
+    if (!game) return;
+    const next = !game.finished;
+    setGame({ ...game, finished: next });
+    await supabase().from("games").update({ finished: next }).eq("id", game.id);
+  }
+
   if (loading || !user) {
     return <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>;
   }
@@ -145,9 +152,23 @@ export default function GameDetailPage() {
     <main className="flex-1 flex flex-col">
       <TopBar title={game.name} />
       <div className="px-5 py-4 flex flex-col gap-3">
-        <BigButton onClick={openAddPlayers} variant="secondary">
-          ➕ Add players
-        </BigButton>
+        {game.finished && (
+          <div className="text-sm text-accent font-medium text-center">✓ This game is finished</div>
+        )}
+
+        <button
+          type="button"
+          onClick={toggleFinished}
+          className={`text-sm underline self-end ${game.finished ? "text-muted" : "text-accent"}`}
+        >
+          {game.finished ? "Unfinish" : "Finish game"}
+        </button>
+
+        {!game.finished && (
+          <BigButton onClick={openAddPlayers} variant="secondary">
+            ➕ Add players
+          </BigButton>
+        )}
 
         {showAddPlayers && (
           <Card>
@@ -201,17 +222,17 @@ export default function GameDetailPage() {
               </div>
               <div className="flex gap-2">
                 <button
-                  disabled={busy !== null}
+                  disabled={busy !== null || game.finished}
                   onClick={() => bump(row.user_id, -1)}
-                  className="rounded-full border border-line bg-surface w-11 h-11 text-xl font-bold"
+                  className="rounded-full border border-line bg-surface w-11 h-11 text-xl font-bold disabled:opacity-30"
                   aria-label="Subtract point"
                 >
                   −
                 </button>
                 <button
-                  disabled={busy !== null}
+                  disabled={busy !== null || game.finished}
                   onClick={() => bump(row.user_id, 1)}
-                  className="rounded-full bg-accent text-white w-11 h-11 text-xl font-bold"
+                  className="rounded-full bg-accent text-white w-11 h-11 text-xl font-bold disabled:opacity-30"
                   aria-label="Add point"
                 >
                   +

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import TopBar from "@/components/TopBar";
 import Card from "@/components/Card";
 import { supabase } from "@/lib/supabase/browser";
@@ -14,6 +14,11 @@ export default function VotePage() {
   const [myVotes, setMyVotes] = useState<Record<string, 1 | -1>>({});
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
+
+  type SortKey = "newest" | "popular" | "controversial";
+  type FilterKey = "all" | "voted" | "unvoted" | "mine";
+  const [sort, setSort] = useState<SortKey>("newest");
+  const [filter, setFilter] = useState<FilterKey>("all");
 
   async function load() {
     if (!user) return;
@@ -116,6 +121,17 @@ export default function VotePage() {
     return <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>;
   }
 
+  const filtered = useMemo(() => {
+    let list = items;
+    if (filter === "voted") list = list.filter((v) => myVotes[v.id] !== undefined);
+    if (filter === "unvoted") list = list.filter((v) => myVotes[v.id] === undefined);
+    if (filter === "mine") list = list.filter((v) => v.proposer_id === user.id);
+    if (sort === "popular") list = [...list].sort((a, b) => b.net - a.net);
+    else if (sort === "controversial") list = [...list].sort((a, b) => Math.min(b.for_count, b.against_count) - Math.min(a.for_count, a.against_count));
+    else list = [...list].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return list;
+  }, [items, myVotes, sort, filter, user]);
+
   return (
     <main className="flex-1 flex flex-col">
       <TopBar title="Vote" />
@@ -140,13 +156,44 @@ export default function VotePage() {
           </form>
         </Card>
 
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-1">
+            {(["newest", "popular", "controversial"] as SortKey[]).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setSort(k)}
+                className={`text-xs px-2.5 py-1 rounded-full font-medium transition ${
+                  sort === k ? "bg-accent text-white" : "bg-surface text-muted border border-line"
+                }`}
+              >
+                {k === "newest" ? "Newest" : k === "popular" ? "Popular" : "Controversial"}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-1">
+            {(["all", "voted", "unvoted", "mine"] as FilterKey[]).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setFilter(k)}
+                className={`text-xs px-2.5 py-1 rounded-full font-medium transition ${
+                  filter === k ? "bg-ink text-white" : "bg-surface text-muted border border-line"
+                }`}
+              >
+                {k === "all" ? "All" : k === "voted" ? "Voted" : k === "unvoted" ? "Not voted" : "Mine"}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <ul className="flex flex-col gap-3">
-          {items.length === 0 && (
+          {filtered.length === 0 && (
             <li className="text-sm text-muted text-center py-8">
-              No proposals yet. Be the first.
+              {filter !== "all" ? "Nothing matches this filter." : "No proposals yet. Be the first."}
             </li>
           )}
-          {items.map((v) => {
+          {filtered.map((v) => {
             const mine = myVotes[v.id];
             return (
               <li

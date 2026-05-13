@@ -17,7 +17,9 @@ const DAILY_LIMIT = 3;
 export default function CameraPage() {
   const { user, loading } = useUser();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const viewRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const [viewDims, setViewDims] = useState({ w: 0, h: 0 });
   const [usedToday, setUsedToday] = useState<number | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [flashing, setFlashing] = useState(false);
@@ -72,6 +74,16 @@ export default function CameraPage() {
     startCamera();
     return stopStream;
   }, [startCamera, stopStream]);
+
+  useEffect(() => {
+    const el = viewRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) =>
+      setViewDims({ w: e.contentRect.width, h: e.contentRect.height }),
+    );
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -154,7 +166,7 @@ export default function CameraPage() {
     <main className="flex-1 flex flex-col bg-black text-white">
       <TopBar title="Camera" />
 
-      <div className="relative flex-1 overflow-hidden bg-black">
+      <div className="relative flex-1 overflow-hidden bg-black" ref={viewRef}>
         <video
           ref={videoRef}
           autoPlay
@@ -162,6 +174,19 @@ export default function CameraPage() {
           muted
           className="absolute inset-0 w-full h-full object-cover"
         />
+
+        {viewDims.w > 0 && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div
+              className="border-2 border-white/30"
+              style={{
+                width: Math.min(viewDims.w, viewDims.h),
+                height: Math.min(viewDims.w, viewDims.h),
+                boxShadow: `0 0 0 ${Math.max(viewDims.w, viewDims.h)}px rgba(0,0,0,0.55)`,
+              }}
+            />
+          </div>
+        )}
 
         {!error && (
           <div className="absolute top-3 right-3 z-10">

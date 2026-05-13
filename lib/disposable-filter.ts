@@ -1,6 +1,6 @@
 import type { FilterVariant } from "./supabase/types";
 
-const MAX_EDGE = 1600;
+const SIZE = 1600;
 
 export function pickFilterVariant(): FilterVariant {
   return Math.random() < 0.5 ? "warm" : "cool";
@@ -14,13 +14,14 @@ export async function applyDisposableFilter(
   const vh = video.videoHeight;
   if (!vw || !vh) throw new Error("Video not ready");
 
-  const scale = Math.min(1, MAX_EDGE / Math.max(vw, vh));
-  const w = Math.round(vw * scale);
-  const h = Math.round(vh * scale);
+  const crop = Math.min(vw, vh);
+  const out = Math.min(SIZE, crop);
+  const sx = (vw - crop) / 2;
+  const sy = (vh - crop) / 2;
 
   const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
+  canvas.width = out;
+  canvas.height = out;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas 2D unavailable");
 
@@ -28,33 +29,33 @@ export async function applyDisposableFilter(
     variant === "warm"
       ? "sepia(0.25) saturate(1.35) contrast(1.15) brightness(1.05) hue-rotate(-8deg)"
       : "saturate(0.85) contrast(1.2) brightness(0.95) hue-rotate(8deg) sepia(0.1)";
-  ctx.drawImage(video, 0, 0, w, h);
+  ctx.drawImage(video, sx, sy, crop, crop, 0, 0, out, out);
   ctx.filter = "none";
 
   if (variant === "cool") {
     ctx.globalCompositeOperation = "multiply";
     ctx.fillStyle = "rgba(180, 210, 220, 0.18)";
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(0, 0, out, out);
     ctx.globalCompositeOperation = "source-over";
   }
 
   const vignette = ctx.createRadialGradient(
-    w / 2,
-    h / 2,
-    Math.min(w, h) * 0.35,
-    w / 2,
-    h / 2,
-    Math.max(w, h) * 0.72,
+    out / 2,
+    out / 2,
+    out * 0.35,
+    out / 2,
+    out / 2,
+    out * 0.72,
   );
   vignette.addColorStop(0, "rgba(0,0,0,0)");
   vignette.addColorStop(1, "rgba(0,0,0,0.55)");
   ctx.globalCompositeOperation = "multiply";
   ctx.fillStyle = vignette;
-  ctx.fillRect(0, 0, w, h);
+  ctx.fillRect(0, 0, out, out);
   ctx.globalCompositeOperation = "source-over";
 
   // Procedural grain: sparse white/black noise pixels with low alpha for film texture.
-  const grain = ctx.createImageData(w, h);
+  const grain = ctx.createImageData(out, out);
   const data = grain.data;
   for (let i = 0; i < data.length; i += 4) {
     if (Math.random() > 0.04) continue;
@@ -65,8 +66,8 @@ export async function applyDisposableFilter(
     data[i + 3] = Math.floor(Math.random() * 60) + 20;
   }
   const grainCanvas = document.createElement("canvas");
-  grainCanvas.width = w;
-  grainCanvas.height = h;
+  grainCanvas.width = out;
+  grainCanvas.height = out;
   const gctx = grainCanvas.getContext("2d");
   if (gctx) {
     gctx.putImageData(grain, 0, 0);
@@ -79,32 +80,32 @@ export async function applyDisposableFilter(
 
   if (variant === "warm" && Math.random() < 0.5) {
     const corners: Array<[number, number, number, number]> = [
-      [0, 0, w * 0.6, h * 0.6],
-      [w, 0, w * 0.4, h * 0.6],
-      [0, h, w * 0.6, h * 0.4],
-      [w, h, w * 0.4, h * 0.4],
+      [0, 0, out * 0.6, out * 0.6],
+      [out, 0, out * 0.4, out * 0.6],
+      [0, out, out * 0.6, out * 0.4],
+      [out, out, out * 0.4, out * 0.4],
     ];
     const [cx, cy] = corners[Math.floor(Math.random() * corners.length)];
-    const leak = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.5);
+    const leak = ctx.createRadialGradient(cx, cy, 0, cx, cy, out * 0.5);
     leak.addColorStop(0, "rgba(255, 150, 60, 0.55)");
     leak.addColorStop(0.5, "rgba(255, 90, 40, 0.15)");
     leak.addColorStop(1, "rgba(255, 90, 40, 0)");
     ctx.globalCompositeOperation = "screen";
     ctx.fillStyle = leak;
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(0, 0, out, out);
     ctx.globalCompositeOperation = "source-over";
   }
 
   const now = new Date();
   const stamp = `'${String(now.getFullYear()).slice(-2)} ${now.getMonth() + 1} ${now.getDate()}`;
-  const fontSize = Math.round(Math.min(w, h) * 0.045);
+  const fontSize = Math.round(out * 0.045);
   ctx.font = `bold ${fontSize}px "Courier New", monospace`;
   ctx.textAlign = "right";
   ctx.textBaseline = "bottom";
   ctx.shadowColor = "rgba(0,0,0,0.6)";
   ctx.shadowBlur = fontSize * 0.3;
   ctx.fillStyle = "rgba(255, 140, 40, 0.95)";
-  ctx.fillText(stamp, w - fontSize * 0.6, h - fontSize * 0.5);
+  ctx.fillText(stamp, out - fontSize * 0.6, out - fontSize * 0.5);
   ctx.shadowColor = "transparent";
   ctx.shadowBlur = 0;
 

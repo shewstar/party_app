@@ -158,17 +158,30 @@ export default function GamesPage() {
               <li key={g.id}>
                 <Link
                   href={`/games/${g.id}`}
-                  className="block bg-surface border border-line rounded-card shadow-card p-4"
+                  className={`block border border-line rounded-card shadow-card p-4 ${
+                    g.finished ? "bg-muted/10" : "bg-surface"
+                  }`}
                 >
                   <div className="flex justify-between items-baseline">
-                    <span className="font-semibold">{g.name}</span>
+                    <span className={`font-semibold ${g.finished ? "line-through text-muted" : ""}`}>{g.name}</span>
                     <span className="text-xs text-muted">{g.totals.length} player{g.totals.length === 1 ? "" : "s"}</span>
                   </div>
-                  {top && (
+                  {g.finished ? (
+                    top ? (
+                      <div className="text-sm mt-1">
+                        <span className="text-xs text-accent font-medium">✓ Finished</span>
+                        <span className="text-muted"> — Winner: </span>
+                        <span className="text-ink font-medium">{top.user_name}</span>
+                        <span className="text-muted"> · {Number(top.total_score)}</span>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-accent mt-1 font-medium">✓ Finished</div>
+                    )
+                  ) : top ? (
                     <div className="text-sm text-muted mt-1">
                       Leading: <span className="text-ink font-medium">{top.user_name}</span> · {Number(top.total_score)}
                     </div>
-                  )}
+                  ) : null}
                 </Link>
               </li>
             );
