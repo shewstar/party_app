@@ -169,7 +169,7 @@ export default function HomePage() {
       </Card>
 
       <Link
-        href="/recap"
+        href="/achievements"
         className="bg-surface border border-line rounded-card shadow-card px-4 py-3 flex items-center gap-3"
       >
         <span className="text-2xl" aria-hidden>
@@ -235,7 +235,8 @@ export default function HomePage() {
               : `${CAMERA_DAILY_LIMIT - cameraUsed} shot${CAMERA_DAILY_LIMIT - cameraUsed === 1 ? "" : "s"} left today`
           }
         />
-        <Tile href="/recap" icon="🏁" label="Recap" sub="End-of-night stats" className="col-span-2" />
+        <Tile href="/recap" icon="🏁" label="Recap" sub="End-of-night stats" />
+        <Tile href="/achievements" icon="🏅" label="Achievements" sub="Your badge book" />
       </div>
 
       {(() => {
