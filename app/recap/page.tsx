@@ -147,7 +147,9 @@ function RecapPageInner() {
     [spins, dayWindow.startMs, dayWindow.endMs],
   );
   const windowedPhotos = useMemo(
-    () => photos.filter((p) => p.party_day === selectedDay),
+    () => photos
+      .filter((p) => p.party_day === selectedDay)
+      .sort((a, b) => new Date(a.taken_at).getTime() - new Date(b.taken_at).getTime()),
     [photos, selectedDay],
   );
   const windowedItineraryEvents = useMemo(
