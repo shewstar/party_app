@@ -117,20 +117,20 @@ export default function VotePage() {
       );
   }
 
-  if (loading || !user) {
-    return <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>;
-  }
-
   const filtered = useMemo(() => {
     let list = items;
     if (filter === "voted") list = list.filter((v) => myVotes[v.id] !== undefined);
     if (filter === "unvoted") list = list.filter((v) => myVotes[v.id] === undefined);
-    if (filter === "mine") list = list.filter((v) => v.proposer_id === user.id);
+    if (filter === "mine") list = list.filter((v) => v.proposer_id === user?.id);
     if (sort === "popular") list = [...list].sort((a, b) => b.net - a.net);
     else if (sort === "controversial") list = [...list].sort((a, b) => Math.min(b.for_count, b.against_count) - Math.min(a.for_count, a.against_count));
     else list = [...list].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     return list;
   }, [items, myVotes, sort, filter, user]);
+
+  if (loading || !user) {
+    return <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>;
+  }
 
   return (
     <main className="flex-1 flex flex-col">
