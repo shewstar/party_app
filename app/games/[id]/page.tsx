@@ -11,7 +11,7 @@ import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
 import { useHaptic } from "@/lib/haptics";
 import { useOnlineStatus } from "@/lib/offline-queue";
-import { useTableData } from "@/lib/realtime-provider";
+import { useTableData, useRealtimeReady } from "@/lib/realtime-provider";
 import type { GameRow, GameTotalsRow, UserRow } from "@/lib/supabase/types";
 
 export default function GameDetailPage() {
@@ -19,11 +19,31 @@ export default function GameDetailPage() {
   const { user, loading } = useUser();
   const haptic = useHaptic();
   const { online, enqueue } = useOnlineStatus();
+  const ready = useRealtimeReady();
   const { data: allGames } = useTableData<GameRow>("games");
   const { data: allTotalsRaw } = useTableData<GameTotalsRow>("v_game_totals");
   const { data: allUsers } = useTableData<UserRow>("users");
-  const [game, setGame] = useState<GameRow | null>(null);
-  const [totals, setTotals] = useState<GameTotalsRow[]>([]);
+
+  const game = useMemo(
+    () => (allGames as GameRow[]).find((g) => g.id === id) ?? null,
+    [allGames, id],
+  );
+  // Optimistic score deltas keyed by user_id — applied on top of provider
+  // totals so taps feel instant. Cleared shortly after; realtime refetch
+  // catches up within a moment of the insert.
+  const [optimisticDeltas, setOptimisticDeltas] = useState<Record<string, number>>({});
+  const optimisticClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Optimistic finished flag for snappy toggle feedback.
+  const [optimisticFinished, setOptimisticFinished] = useState<boolean | null>(null);
+  const totals = useMemo(() => {
+    const base = (allTotalsRaw as GameTotalsRow[]).filter((t) => t.game_id === id);
+    if (Object.keys(optimisticDeltas).length === 0) return base;
+    return base.map((t) => ({
+      ...t,
+      total_score: Number(t.total_score) + (optimisticDeltas[t.user_id] ?? 0),
+    }));
+  }, [allTotalsRaw, id, optimisticDeltas]);
+
   const [busy, setBusy] = useState<string | null>(null);
   const [frozenOrder, setFrozenOrder] = useState<string[] | null>(null);
   const frozenOrderRef = useRef<string[] | null>(null);
@@ -35,6 +55,7 @@ export default function GameDetailPage() {
   useEffect(() => {
     return () => {
       if (resortTimer.current) clearTimeout(resortTimer.current);
+      if (optimisticClearTimer.current) clearTimeout(optimisticClearTimer.current);
     };
   }, []);
 
@@ -51,14 +72,10 @@ export default function GameDetailPage() {
     resortTimer.current = setTimeout(() => setFrozenOrder(null), 1500);
 
     setBusy(`${userId}:${delta}`);
-    // Optimistic.
-    setTotals((arr) =>
-      arr.map((r) =>
-        r.user_id === userId
-          ? { ...r, total_score: Number(r.total_score) + delta }
-          : r,
-      ),
-    );
+    setOptimisticDeltas((prev) => ({ ...prev, [userId]: (prev[userId] ?? 0) + delta }));
+    if (optimisticClearTimer.current) clearTimeout(optimisticClearTimer.current);
+    optimisticClearTimer.current = setTimeout(() => setOptimisticDeltas({}), 1500);
+
     const payload = { game_id: game.id, user_id: userId, score: delta };
     if (!online) {
       enqueue("game_scores", payload);
@@ -95,12 +112,14 @@ export default function GameDetailPage() {
 
   async function toggleFinished() {
     if (!game) return;
-    const next = !game.finished;
-    setGame({ ...game, finished: next });
+    const next = !finished;
+    setOptimisticFinished(next);
     await supabase().from("games").update({ finished: next }).eq("id", game.id);
+    // Clear after realtime should have refreshed the games table.
+    setTimeout(() => setOptimisticFinished(null), 1500);
   }
 
-  if (loading || !user) {
+  if (loading || !user || !ready) {
     return <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>;
   }
   if (!game) {
@@ -111,6 +130,7 @@ export default function GameDetailPage() {
       </main>
     );
   }
+  const finished = optimisticFinished ?? game.finished;
 
   const sorted = frozenOrder
     ? [
@@ -128,19 +148,19 @@ export default function GameDetailPage() {
     <main className="flex-1 flex flex-col">
       <TopBar title={game.name} />
       <div className="px-5 py-4 flex flex-col gap-3">
-        {game.finished && (
+        {finished && (
           <div className="text-sm text-accent font-medium text-center">✓ This game is finished</div>
         )}
 
         <button
           type="button"
           onClick={toggleFinished}
-          className={`text-sm underline self-end ${game.finished ? "text-muted" : "text-accent"}`}
+          className={`text-sm underline self-end ${finished ? "text-muted" : "text-accent"}`}
         >
-          {game.finished ? "Unfinish" : "Finish game"}
+          {finished ? "Unfinish" : "Finish game"}
         </button>
 
-        {!game.finished && (
+        {!finished && (
           <BigButton onClick={openAddPlayers} variant="secondary">
             ➕ Add players
           </BigButton>
@@ -198,7 +218,7 @@ export default function GameDetailPage() {
               </div>
               <div className="flex gap-2">
                 <button
-                  disabled={busy !== null || game.finished}
+                  disabled={busy !== null || finished}
                   onClick={() => bump(row.user_id, -1)}
                   className="rounded-full border border-line bg-surface w-11 h-11 text-xl font-bold disabled:opacity-30"
                   aria-label="Subtract point"
@@ -206,7 +226,7 @@ export default function GameDetailPage() {
                   −
                 </button>
                 <button
-                  disabled={busy !== null || game.finished}
+                  disabled={busy !== null || finished}
                   onClick={() => bump(row.user_id, 1)}
                   className="rounded-full bg-accent text-white w-11 h-11 text-xl font-bold disabled:opacity-30"
                   aria-label="Add point"
