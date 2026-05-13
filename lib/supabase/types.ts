@@ -8,6 +8,7 @@ export type UserRow = {
   sex: Sex | null;
   first_drink_at: string | null;
   avatar_url: string | null;
+  is_itinerary_editor: boolean;
   created_at: string;
 };
 
@@ -88,6 +89,25 @@ export type SpinRow = {
   spinner_id: string | null;
   winner_id: string;
   pool: string[];
+  created_at: string;
+};
+
+export type ItineraryEventRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  sort_order: number;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type ItineraryReactionRow = {
+  event_id: string;
+  user_id: string;
+  reaction: string;
   created_at: string;
 };
 

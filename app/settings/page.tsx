@@ -8,6 +8,8 @@ import Avatar from "@/components/Avatar";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
 
+const HIDDEN_TAPS = 5;
+
 function toLocalInput(iso: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -23,6 +25,11 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+
+  // Hidden itinerary editor toggle
+  const [hiddenTap, setHiddenTap] = useState(0);
+  const [showEditor, setShowEditor] = useState(false);
+  const [togglingEditor, setTogglingEditor] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -103,6 +110,29 @@ export default function SettingsPage() {
     else setMsg("Drink history cleared.");
   }
 
+  async function toggleEditor() {
+    if (!user) return;
+    setTogglingEditor(true);
+    const next = !user.is_itinerary_editor;
+    const { error } = await supabase()
+      .from("users")
+      .update({ is_itinerary_editor: next })
+      .eq("id", user.id);
+    setTogglingEditor(false);
+    if (error) { setMsg(error.message); return; }
+    setMsg(next ? "You are now an itinerary editor." : "Itinerary editor disabled.");
+    await refresh();
+  }
+
+  function handleHiddenTap() {
+    const next = hiddenTap + 1;
+    setHiddenTap(next);
+    if (next >= HIDDEN_TAPS) {
+      setShowEditor(true);
+      setHiddenTap(0);
+    }
+  }
+
   return (
     <main className="flex-1 flex flex-col">
       <TopBar title="Settings" />
@@ -176,6 +206,41 @@ export default function SettingsPage() {
             </BigButton>
           </div>
         </Card>
+
+        <div className="flex justify-center">
+          <button
+            onClick={handleHiddenTap}
+            className={`text-xs transition ${
+              showEditor ? "text-muted/40" : "text-muted/10 hover:text-muted/30"
+            }`}
+          >
+            {showEditor ? "🛠️" : "·"}
+          </button>
+        </div>
+
+        {showEditor && (
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-semibold text-sm">Itinerary Editor</div>
+                <div className="text-xs text-muted">Add & edit events on the itinerary</div>
+              </div>
+              <button
+                onClick={toggleEditor}
+                disabled={togglingEditor}
+                className={`relative w-11 h-6 rounded-full transition ${
+                  user.is_itinerary_editor ? "bg-accent" : "bg-muted"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition ${
+                    user.is_itinerary_editor ? "left-5" : "left-0.5"
+                  }`}
+                />
+              </button>
+            </div>
+          </Card>
+        )}
       </div>
     </main>
   );

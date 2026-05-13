@@ -165,8 +165,8 @@ export default function HomePage() {
         <Tile href="/games" icon="🎯" label="Games" sub="Score it" />
         <Tile href="/leaderboards" icon="🏆" label="Leaderboards" sub="Who's winning" />
         <Tile href="/vote" icon="🗳️" label="Vote" sub="Propose rules" badge={newVoteCount} />
-        <Tile href="/settings" icon="⚙️" label="Settings" sub="You & BAC" />
-        <Tile href="/spin" icon="🎡" label="Spin" sub="Pick someone" className="col-span-2" />
+        <Tile href="/itinerary" icon="📋" label="Itinerary" sub="What's happening" />
+        <Tile href="/spin" icon="🎡" label="Spin" sub="Pick someone" />
         <Tile
           href="/camera"
           icon="📷"
@@ -176,7 +176,6 @@ export default function HomePage() {
               ? "No film left — develops at 5am"
               : `${CAMERA_DAILY_LIMIT - cameraUsed} shot${CAMERA_DAILY_LIMIT - cameraUsed === 1 ? "" : "s"} left today`
           }
-          className="col-span-2"
         />
         <Tile href="/recap" icon="🏁" label="Recap" sub="End-of-night stats" className="col-span-2" />
       </div>
