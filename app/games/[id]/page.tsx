@@ -9,11 +9,13 @@ import BigButton from "@/components/BigButton";
 import Chip from "@/components/Chip";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
+import { useHaptic } from "@/lib/haptics";
 import type { GameRow, GameTotalsRow, UserRow } from "@/lib/supabase/types";
 
 export default function GameDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user, loading } = useUser();
+  const haptic = useHaptic();
   const [game, setGame] = useState<GameRow | null>(null);
   const [totals, setTotals] = useState<GameTotalsRow[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -64,6 +66,7 @@ export default function GameDetailPage() {
 
   async function bump(userId: string, delta: number) {
     if (!game) return;
+    haptic.light();
     setFrozenOrder((prev) => {
       if (prev) return prev;
       return [...totals]

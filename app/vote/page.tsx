@@ -5,11 +5,13 @@ import TopBar from "@/components/TopBar";
 import Card from "@/components/Card";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
+import { useHaptic } from "@/lib/haptics";
 import type { VoteResponseRow, VoteTallyRow } from "@/lib/supabase/types";
 import clsx from "@/components/clsx";
 
 export default function VotePage() {
   const { user, loading } = useUser();
+  const haptic = useHaptic();
   const [items, setItems] = useState<VoteTallyRow[]>([]);
   const [myVotes, setMyVotes] = useState<Record<string, 1 | -1>>({});
   const [text, setText] = useState("");
@@ -70,6 +72,7 @@ export default function VotePage() {
 
   async function castVote(item: VoteTallyRow, value: 1 | -1) {
     if (!user) return;
+    haptic.medium();
     const previous = myVotes[item.id];
     if (previous === value) {
       // Toggle off — delete the response.

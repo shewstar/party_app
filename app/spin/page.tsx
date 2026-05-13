@@ -8,6 +8,7 @@ import Chip from "@/components/Chip";
 import Avatar from "@/components/Avatar";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
+import { useHaptic } from "@/lib/haptics";
 import type { UserRow } from "@/lib/supabase/types";
 
 const WHEEL_COLORS = [
@@ -48,6 +49,7 @@ function initialsOf(name: string) {
 
 export default function SpinPage() {
   const { user, loading } = useUser();
+  const haptic = useHaptic();
   const [members, setMembers] = useState<UserRow[]>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [rotation, setRotation] = useState(0);
@@ -127,6 +129,7 @@ export default function SpinPage() {
     setTimeout(async () => {
       setSpinning(false);
       setWinner(winnerUser);
+      haptic.success();
       await supabase().from("spins").insert({
         spinner_id: user?.id ?? null,
         winner_id: winnerUser.id,

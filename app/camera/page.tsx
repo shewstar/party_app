@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import TopBar from "@/components/TopBar";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
+import { useHaptic } from "@/lib/haptics";
 import { partyDayKey } from "@/lib/recap";
 import {
   applyDisposableFilter,
@@ -16,6 +17,7 @@ const DAILY_LIMIT = 3;
 
 export default function CameraPage() {
   const { user, loading } = useUser();
+  const haptic = useHaptic();
   const videoRef = useRef<HTMLVideoElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -123,6 +125,7 @@ export default function CameraPage() {
     setCapturing(true);
     setFlashing(true);
     playShutterSound();
+    haptic.medium();
     setTimeout(() => setFlashing(false), 120);
 
     try {

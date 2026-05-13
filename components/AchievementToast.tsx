@@ -2,15 +2,18 @@
 
 import { useEffect } from "react";
 import { useAchievements } from "@/lib/achievements-tracker";
+import { useHaptic } from "@/lib/haptics";
 import AchievementBadge from "./AchievementBadge";
 
 const AUTO_DISMISS_MS = 5000;
 
 export default function AchievementToast() {
   const { toasts, dismiss } = useAchievements();
+  const haptic = useHaptic();
 
   useEffect(() => {
     if (toasts.length === 0) return;
+    haptic.success();
     const timers = toasts.map((t) =>
       setTimeout(() => dismiss(t.key), AUTO_DISMISS_MS),
     );

@@ -16,11 +16,13 @@ import {
 import { estimateBAC } from "@/lib/bac";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
+import { useHaptic } from "@/lib/haptics";
 import type { DrinkCategory, DrinkRow } from "@/lib/supabase/types";
 
 export default function AddDrinkPage() {
   const router = useRouter();
   const { user, loading } = useUser();
+  const haptic = useHaptic();
   const [category, setCategory] = useState<DrinkCategory | null>(null);
   const [presetId, setPresetId] = useState<string | null>(null);
   const [customVol, setCustomVol] = useState("");
@@ -126,6 +128,7 @@ export default function AddDrinkPage() {
       alert(err.message);
       return;
     }
+    haptic.success();
     router.push("/");
   }
 
