@@ -221,7 +221,7 @@ export default function HomePage() {
               </span>
             )}
           </div>
-          <div className="font-semibold truncate">
+          <div className="font-semibold text-sm truncate">
             {latestEvent?.text ?? "Nothing yet — get the party started"}
           </div>
         </div>
