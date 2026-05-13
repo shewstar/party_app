@@ -8,6 +8,7 @@ import Tile from "@/components/Tile";
 import Avatar from "@/components/Avatar";
 import BACBadge from "@/components/BACBadge";
 import DisclaimerFooter from "@/components/DisclaimerFooter";
+import { SkeletonAvatar, SkeletonBlock, SkeletonCard, SkeletonLine, SkeletonTile } from "@/components/Skeleton";
 import { supabase } from "@/lib/supabase/browser";
 import { estimateBAC } from "@/lib/bac";
 import { useUser } from "@/lib/user-context";
@@ -147,7 +148,27 @@ export default function HomePage() {
   );
 
   if (loading || !user) {
-    return <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>;
+    return (
+      <main className="flex-1 px-5 py-6 flex flex-col gap-6">
+        <div className="flex items-center gap-3">
+          <SkeletonAvatar size={44} />
+          <div className="flex flex-col gap-1.5">
+            <SkeletonLine width="w-10" height="h-3" />
+            <SkeletonLine width="w-24" height="h-5" />
+          </div>
+        </div>
+        <SkeletonCard rows={2} className="grid grid-cols-2 gap-4" />
+        <div className="bg-surface border border-line rounded-card py-7" />
+        <SkeletonCard rows={1} />
+        <div className="grid grid-cols-2 gap-3">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <SkeletonTile key={i} />
+          ))}
+        </div>
+        <SkeletonCard rows={2} />
+        <SkeletonCard rows={5} />
+      </main>
+    );
   }
 
   return (

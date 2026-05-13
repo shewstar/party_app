@@ -8,6 +8,7 @@ import BigButton from "@/components/BigButton";
 import Chip from "@/components/Chip";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
+import { SkeletonCard } from "@/components/Skeleton";
 import type { GameRow, GameTotalsRow, UserRow } from "@/lib/supabase/types";
 
 type GameSummary = GameRow & { totals: GameTotalsRow[] };
@@ -120,7 +121,14 @@ export default function GamesPage() {
   }
 
   if (loading || !user) {
-    return <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>;
+    return (
+      <main className="flex-1 flex flex-col">
+        <TopBar title="Games" />
+        <div className="px-5 py-4 flex flex-col gap-4">
+          <SkeletonCard rows={3} />
+        </div>
+      </main>
+    );
   }
 
   return (

@@ -25,6 +25,7 @@ import {
 } from "@/lib/recap";
 import { earnedForUser, evaluateAchievements } from "@/lib/achievements";
 import { useUser } from "@/lib/user-context";
+import { SkeletonCard } from "@/components/Skeleton";
 import type {
   AppOpenRow,
   CameraPhotoRow,
@@ -45,7 +46,15 @@ import type {
 export default function RecapPage() {
   return (
     <Suspense
-      fallback={<main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>}
+      fallback={
+        <main className="flex-1 flex flex-col">
+          <TopBar title="Recap" />
+          <div className="px-5 pb-4 flex flex-col gap-4 flex-1">
+            <SkeletonCard rows={2} />
+            <SkeletonCard rows={1} />
+          </div>
+        </main>
+      }
     >
       <RecapPageInner />
     </Suspense>
@@ -446,7 +455,17 @@ function RecapPageInner() {
   }
 
   if (loading || !user) {
-    return <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>;
+    return (
+      <main className="flex-1 flex flex-col">
+        <TopBar title="Recap" />
+        <div className="px-5 pb-4 flex flex-col gap-4 flex-1">
+          <SkeletonCard rows={2} />
+          <SkeletonCard rows={1} />
+          <SkeletonCard rows={2} />
+          <SkeletonCard rows={3} />
+        </div>
+      </main>
+    );
   }
 
   const isEmpty = windowedDrinks.length === 0;

@@ -7,6 +7,7 @@ import BigButton from "@/components/BigButton";
 import Avatar from "@/components/Avatar";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
+import { SkeletonCard } from "@/components/Skeleton";
 import type { ItineraryEventRow, ItineraryReactionRow, UserRow } from "@/lib/supabase/types";
 
 const REACTIONS = ["👍", "😂", "🍻", "🔥", "🎉", "💀"];
@@ -148,7 +149,14 @@ export default function ItineraryPage() {
   const isEditor = user?.is_itinerary_editor ?? false;
 
   if (loading || !user) {
-    return <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>;
+    return (
+      <main className="flex-1 flex flex-col">
+        <TopBar title="Itinerary" />
+        <div className="px-5 py-4 flex flex-col gap-4">
+          <SkeletonCard rows={2} />
+        </div>
+      </main>
+    );
   }
 
   return (

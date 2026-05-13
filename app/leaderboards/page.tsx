@@ -9,6 +9,7 @@ import DisclaimerFooter from "@/components/DisclaimerFooter";
 import { supabase } from "@/lib/supabase/browser";
 import { estimateBAC } from "@/lib/bac";
 import { useUser } from "@/lib/user-context";
+import { SkeletonCard } from "@/components/Skeleton";
 import clsx from "@/components/clsx";
 import type {
   DrinkRow,
@@ -152,7 +153,14 @@ export default function LeaderboardsPage() {
   }, [users, drinkBoard, gameRows]);
 
   if (loading || !user) {
-    return <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>;
+    return (
+      <main className="flex-1 flex flex-col">
+        <TopBar title="Leaderboards" />
+        <div className="px-5 pb-4 flex flex-col gap-3 flex-1">
+          <SkeletonCard rows={5} />
+        </div>
+      </main>
+    );
   }
 
   return (

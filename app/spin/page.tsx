@@ -9,6 +9,7 @@ import Avatar from "@/components/Avatar";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
 import { useHaptic } from "@/lib/haptics";
+import { SkeletonCard } from "@/components/Skeleton";
 import type { UserRow } from "@/lib/supabase/types";
 
 const WHEEL_COLORS = [
@@ -139,7 +140,14 @@ export default function SpinPage() {
   }
 
   if (loading || !user) {
-    return <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>;
+    return (
+      <main className="flex-1 flex flex-col">
+        <TopBar title="Spin" />
+        <div className="px-5 py-4 flex flex-col gap-5">
+          <SkeletonCard rows={2} />
+        </div>
+      </main>
+    );
   }
 
   const n = pool.length;

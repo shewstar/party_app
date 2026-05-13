@@ -6,6 +6,7 @@ import Card from "@/components/Card";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
 import { useHaptic } from "@/lib/haptics";
+import { SkeletonCard } from "@/components/Skeleton";
 import type { VoteResponseRow, VoteTallyRow } from "@/lib/supabase/types";
 import clsx from "@/components/clsx";
 
@@ -186,7 +187,14 @@ export default function VotePage() {
   }, [items, myVotes, sort, filter, user]);
 
   if (loading || !user) {
-    return <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>;
+    return (
+      <main className="flex-1 flex flex-col">
+        <TopBar title="Vote" />
+        <div className="px-5 py-4 flex flex-col gap-4">
+          <SkeletonCard rows={3} />
+        </div>
+      </main>
+    );
   }
 
   return (

@@ -17,6 +17,7 @@ import { estimateBAC } from "@/lib/bac";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
 import { useHaptic } from "@/lib/haptics";
+import { SkeletonCard } from "@/components/Skeleton";
 import type { DrinkCategory, DrinkRow } from "@/lib/supabase/types";
 
 export default function AddDrinkPage() {
@@ -59,7 +60,12 @@ export default function AddDrinkPage() {
 
   if (loading || !user) {
     return (
-      <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>
+      <main className="flex-1 flex flex-col">
+        <TopBar title="Add a drink" />
+        <div className="px-5 py-4 flex flex-col gap-4">
+          <SkeletonCard rows={2} />
+        </div>
+      </main>
     );
   }
 
