@@ -129,8 +129,9 @@ export function formatEarnedAt(ts: number, now: number): string {
     d.getFullYear() === today.getFullYear() &&
     d.getMonth() === today.getMonth() &&
     d.getDate() === today.getDate();
+  const weekday = d.toLocaleDateString([], { weekday: "short" });
   const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  if (sameDay) return time;
+  if (sameDay) return `${weekday} · ${time}`;
   const date = d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
   return `${date} · ${time}`;
 }
