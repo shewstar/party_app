@@ -243,7 +243,7 @@ export default function HomePage() {
         return (
           <Card>
             <div className="flex items-baseline justify-between mb-3">
-              <h2 className="font-semibold">Voted in</h2>
+              <h2 className="font-semibold">Democratic Direction</h2>
               <Link href="/vote" className="text-sm text-accent">
                 Vote →
               </Link>
