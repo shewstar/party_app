@@ -4,6 +4,7 @@ import { UserProvider } from "@/lib/user-context";
 import { AchievementsProvider } from "@/lib/achievements-tracker";
 import AchievementToast from "@/components/AchievementToast";
 import PushPermissionBanner from "@/components/PushPermissionBanner";
+import OfflineBanner from "@/components/OfflineBanner";
 
 export const metadata: Metadata = {
   title: "Bucks Party",
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="mx-auto max-w-md min-h-dvh flex flex-col">{children}</div>
             <AchievementToast />
             <PushPermissionBanner />
+            <OfflineBanner />
           </AchievementsProvider>
         </UserProvider>
       </body>
