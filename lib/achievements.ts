@@ -88,7 +88,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "wallflower", title: "Wallflower", blurb: "Didn't vote on a single thing.", icon: "🐭", tier: "fail", timing: "endOfDay" },
 
   // Games — live
-  { id: "clutch", title: "Clutch", blurb: "Leading a game by exactly 1.", icon: "🎯", tier: "win", timing: "live" },
+  { id: "clutch", title: "Clutch", blurb: "Won a finished game by exactly 1 point.", icon: "🎯", tier: "win", timing: "endOfDay" },
   { id: "triathlete", title: "Triathlete", blurb: "Joined 3+ games.", icon: "🎮", tier: "win", timing: "live" },
   { id: "gauntlet", title: "Gauntlet", blurb: "Joined 10+ games.", icon: "🕹️", tier: "win", timing: "live" },
   { id: "net-negative", title: "Net Negative", blurb: "Game score dropped below zero.", icon: "🤡", tier: "fail", timing: "live" },
@@ -484,20 +484,6 @@ export function earnedForUser(
     if (myGames.length >= 10) {
       out.push(make("gauntlet", userId, `${myGames.length} games`, undefined, myGameStartTimes[9]));
     }
-    // Clutch — leading by exactly 1 in any game
-    for (const gameId of myGameIds) {
-      const totals = ctx.gameTotals.filter((t) => t.game_id === gameId);
-      if (totals.length < 2) continue;
-      const sorted = [...totals].sort(
-        (a, b) => Number(b.total_score) - Number(a.total_score),
-      );
-      if (
-        sorted[0].user_id === userId &&
-        Number(sorted[0].total_score) - Number(sorted[1].total_score) === 1
-      ) {
-        out.push(make("clutch", userId, "leading by 1", gameId, gameLastActivityMs(gameId)));
-      }
-    }
     const negative = myGameTotals.find((t) => Number(t.total_score) < 0);
     if (negative) {
       out.push(make("net-negative", userId, undefined, undefined, gameLastActivityMs(negative.game_id)));
@@ -557,6 +543,19 @@ export function earnedForUser(
           out.push(make("bagel", userId, "0 pts", t.game_id, gameLastActivityMs(t.game_id)));
           break;
         }
+      }
+    }
+    for (const gameId of myFinishedGameIds) {
+      const totals = finishedTotals.filter((t) => t.game_id === gameId);
+      if (totals.length < 2) continue;
+      const sorted = [...totals].sort(
+        (a, b) => Number(b.total_score) - Number(a.total_score),
+      );
+      if (sorted[0].user_id !== userId) continue;
+      const margin = Number(sorted[0].total_score) - Number(sorted[1].total_score);
+      if (margin === 1) {
+        out.push(make("clutch", userId, "won by 1", gameId, gameLastActivityMs(gameId)));
+        break;
       }
     }
     for (const gameId of myFinishedGameIds) {
