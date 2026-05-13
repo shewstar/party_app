@@ -21,16 +21,16 @@ export default function Tile({
     <Link
       href={href}
       className={clsx(
-        "relative rounded-card border border-line bg-surface px-4 py-5 flex flex-col items-start gap-1",
+        "relative rounded-card border border-line bg-surface px-4 py-4 flex flex-col items-start gap-0.5",
         "shadow-card hover:bg-surface2 transition",
         className,
       )}
     >
-      <span className="text-2xl" aria-hidden>
+      <span className="text-xl" aria-hidden>
         {icon}
       </span>
-      <span className="font-semibold text-base">{label}</span>
-      {sub && <span className="text-sm text-muted">{sub}</span>}
+      <span className="font-semibold text-sm">{label}</span>
+      {sub && <span className="text-xs text-muted">{sub}</span>}
       {badge !== undefined && badge > 0 && (
         <span className="absolute -top-2 -right-2 min-w-[28px] h-7 px-2 rounded-full bg-danger text-white text-sm font-bold flex items-center justify-center tabular-nums shadow-card ring-2 ring-white">
           {badge > 99 ? "99+" : badge}
