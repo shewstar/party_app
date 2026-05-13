@@ -11,11 +11,21 @@ import DisclaimerFooter from "@/components/DisclaimerFooter";
 import { SkeletonAvatar, SkeletonCard, SkeletonLine, SkeletonTile } from "@/components/Skeleton";
 import { estimateBAC } from "@/lib/bac";
 import { useUser } from "@/lib/user-context";
-import { useAchievements } from "@/lib/achievements-tracker";
 import { useTableData } from "@/lib/realtime-provider";
 import { useOnlineStatus } from "@/lib/offline-queue";
 import { partyDayKey } from "@/lib/recap";
-import type { DrinkRow, DrinksLeaderboardRow, UserRow, VoteTallyRow } from "@/lib/supabase/types";
+import { buildTimelineEvents, formatTimeAgo } from "@/lib/timeline-events";
+import type {
+  DrinkRow,
+  DrinksLeaderboardRow,
+  GameRow,
+  GameScoreRow,
+  GameTotalsRow,
+  ItineraryEventRow,
+  SpinRow,
+  UserRow,
+  VoteTallyRow,
+} from "@/lib/supabase/types";
 
 const CAMERA_DAILY_LIMIT = 3;
 
@@ -48,7 +58,6 @@ function timeSince(iso: string | null): string {
 
 export default function HomePage() {
   const { user, loading } = useUser();
-  const { liveEarned } = useAchievements();
   const { online } = useOnlineStatus();
 
   const { data: allDrinks } = useTableData<DrinkRow>("drink_entries");
@@ -58,6 +67,11 @@ export default function HomePage() {
   const { data: allVoteResponses } = useTableData<{ vote_item_id: string; user_id: string }>("vote_responses");
   const { data: allPhotos } = useTableData<{ id: string; user_id: string; party_day: string }>("camera_photos");
   const { data: allUsers } = useTableData<UserRow>("users");
+  const { data: allGames } = useTableData<GameRow>("games");
+  const { data: allGameTotals } = useTableData<GameTotalsRow>("v_game_totals");
+  const { data: allGameScores } = useTableData<GameScoreRow>("game_scores");
+  const { data: allSpins } = useTableData<SpinRow>("spins");
+  const { data: allItinerary } = useTableData<ItineraryEventRow>("itinerary_events");
 
   const todayKey = partyDayKey(Date.now());
 
@@ -117,6 +131,20 @@ export default function HomePage() {
     () => (buckUser ? estimateBAC(buckUser, buckDrinks) : null),
     [buckUser, buckDrinks],
   );
+
+  const latestEvent = useMemo(() => {
+    const events = buildTimelineEvents({
+      users: (allUsers as UserRow[]) ?? [],
+      drinks: (allDrinks as DrinkRow[]) ?? [],
+      votes: (tally as VoteTallyRow[]) ?? [],
+      games: (allGames as GameRow[]) ?? [],
+      gameTotals: (allGameTotals as GameTotalsRow[]) ?? [],
+      gameScores: (allGameScores as GameScoreRow[]) ?? [],
+      spins: (allSpins as SpinRow[]) ?? [],
+      itinerary: (allItinerary as ItineraryEventRow[]) ?? [],
+    });
+    return events[0] ?? null;
+  }, [allUsers, allDrinks, tally, allGames, allGameTotals, allGameScores, allSpins, allItinerary]);
 
   if (loading || !user) {
     return (
@@ -178,22 +206,23 @@ export default function HomePage() {
       </Card>
 
       <Link
-        href="/achievements"
+        href="/timeline"
         className="bg-surface border border-line rounded-card shadow-card px-4 py-3 flex items-center gap-3"
       >
         <span className="text-2xl" aria-hidden>
-          {liveEarned[liveEarned.length - 1]?.icon ?? "🎖"}
+          {latestEvent?.icon ?? "📜"}
         </span>
         <div className="flex-1 min-w-0">
-          <div className="text-xs uppercase tracking-wide text-muted">
-            Tonight's achievements
+          <div className="text-xs uppercase tracking-wide text-muted flex items-center gap-2">
+            <span>Latest</span>
+            {latestEvent && (
+              <span className="tabular-nums normal-case tracking-normal">
+                · {formatTimeAgo(latestEvent.ts, Date.now())}
+              </span>
+            )}
           </div>
           <div className="font-semibold truncate">
-            {liveEarned.length === 0
-              ? "None yet — get into it"
-              : liveEarned.length === 1
-                ? liveEarned[0].title
-                : `${liveEarned.length} earned · latest: ${liveEarned[liveEarned.length - 1].title}`}
+            {latestEvent?.text ?? "Nothing yet — get the party started"}
           </div>
         </div>
         <span className="text-muted text-sm">→</span>
@@ -229,12 +258,9 @@ export default function HomePage() {
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        <Tile href="/games" icon="🎯" label="Games" sub="Score it" />
-        <Tile href="/leaderboards" icon="🏆" label="Leaderboards" sub="Who's winning" />
         <Tile href="/vote" icon="🗳️" label="Vote" sub="Propose rules" badge={newVoteCount} />
         <Tile href="/itinerary" icon="📋" label="Itinerary" sub="What's happening" />
-        <Tile href="/spin" icon="🎰" label="Spin" sub="Pick someone" />
-        <Tile href="/timeline" icon="📜" label="Timeline" sub="Live feed" />
+        <Tile href="/games" icon="🎯" label="Games" sub="Score it" />
         <Tile
           href="/camera"
           icon="📷"
@@ -245,7 +271,9 @@ export default function HomePage() {
               : `${CAMERA_DAILY_LIMIT - cameraUsed} shot${CAMERA_DAILY_LIMIT - cameraUsed === 1 ? "" : "s"} left today`
           }
         />
+        <Tile href="/spin" icon="🎰" label="Spin" sub="Pick someone" />
         <Tile href="/recap" icon="🏁" label="Recap" sub="End-of-night stats" />
+        <Tile href="/leaderboards" icon="🏆" label="Leaderboards" sub="Who's winning" />
         <Tile href="/achievements" icon="🏅" label="Achievements" sub="Your badge book" />
       </div>
 

@@ -4,9 +4,9 @@ import { useMemo } from "react";
 import TopBar from "@/components/TopBar";
 import Avatar from "@/components/Avatar";
 import { useUser } from "@/lib/user-context";
-import { useTableData } from "@/lib/realtime-provider";
-import { useRealtimeReady } from "@/lib/realtime-provider";
+import { useTableData, useRealtimeReady } from "@/lib/realtime-provider";
 import { SkeletonCard } from "@/components/Skeleton";
+import { buildTimelineEvents, formatTimeAgo } from "@/lib/timeline-events";
 import type {
   DrinkRow,
   GameRow,
@@ -15,23 +15,8 @@ import type {
   ItineraryEventRow,
   SpinRow,
   UserRow,
-  VoteItemRow,
   VoteTallyRow,
 } from "@/lib/supabase/types";
-
-type TimelineEvent = {
-  key: string;
-  icon: string;
-  text: string;
-  ts: number;
-  userId: string | null;
-};
-
-const CATEGORY_EMOJI: Record<string, string> = {
-  beer: "\uD83C\uDF7A",
-  wine: "\uD83C\uDF77",
-  spirits: "\uD83E\uDD43",
-};
 
 export default function TimelinePage() {
   const { user, loading } = useUser();
@@ -45,105 +30,35 @@ export default function TimelinePage() {
   const { data: allSpins } = useTableData<SpinRow>("spins");
   const { data: allItinerary } = useTableData<ItineraryEventRow>("itinerary_events");
 
-  const users = (allUsers ?? []) as UserRow[];
   const userById = useMemo(() => {
     const map = new Map<string, UserRow>();
-    for (const u of users) map.set(u.id, u);
+    for (const u of allUsers ?? []) map.set(u.id, u);
     return map;
-  }, [users]);
+  }, [allUsers]);
 
-  const events = useMemo<TimelineEvent[]>(() => {
-    const list: TimelineEvent[] = [];
-
-    // Drinks
-    for (const d of (allDrinks ?? []) as DrinkRow[]) {
-      const u = userById.get(d.user_id);
-      const emoji = CATEGORY_EMOJI[d.category] ?? "\uD83C\uDF7A";
-      list.push({
-        key: `drink-${d.id}`,
-        icon: emoji,
-        text: `${u?.name ?? "Someone"} logged a ${d.label ?? d.category}`,
-        ts: new Date(d.logged_at).getTime(),
-        userId: d.user_id,
-      });
-    }
-
-    // Vote proposals
-    for (const v of (allVotes ?? []) as VoteTallyRow[]) {
-      const u = v.proposer_id ? userById.get(v.proposer_id) : null;
-      const status = v.net > 0 ? ` (+${v.net})` : v.net < 0 ? ` (${v.net})` : "";
-      list.push({
-        key: `vote-${v.id}`,
-        icon: "\uD83D\uDDF3\uFE0F",
-        text: `${u?.name ?? "Someone"} proposed: "${v.text}"${status}`,
-        ts: new Date(v.created_at).getTime(),
-        userId: v.proposer_id,
-      });
-    }
-
-    // Games — wins
-    const gameTotals = (allGameTotals ?? []) as GameTotalsRow[];
-    const totalsByGame = new Map<string, GameTotalsRow[]>();
-    for (const t of gameTotals) {
-      const list = totalsByGame.get(t.game_id) ?? [];
-      list.push(t);
-      totalsByGame.set(t.game_id, list);
-    }
-    const gameById = new Map<string, GameRow>();
-    for (const g of (allGames ?? []) as GameRow[]) gameById.set(g.id, g);
-    // Latest score per game = effective "finished at" (long games may have
-    // started hours before the win, so created_at would mis-position them).
-    const lastScoreAtByGame = new Map<string, number>();
-    for (const sc of (allGameScores ?? []) as GameScoreRow[]) {
-      const t = new Date(sc.recorded_at).getTime();
-      const prev = lastScoreAtByGame.get(sc.game_id) ?? 0;
-      if (t > prev) lastScoreAtByGame.set(sc.game_id, t);
-    }
-
-    for (const [gameId, rows] of totalsByGame) {
-      const game = gameById.get(gameId);
-      if (!game || !game.finished) continue;
-      const winner = [...rows].sort((a, b) => Number(b.total_score) - Number(a.total_score))[0];
-      if (winner) {
-        const u = userById.get(winner.user_id);
-        list.push({
-          key: `game-won-${gameId}`,
-          icon: "\uD83C\uDFC6",
-          text: `${u?.name ?? "Someone"} won ${game.name}`,
-          ts: lastScoreAtByGame.get(gameId) ?? new Date(game.created_at).getTime(),
-          userId: winner.user_id,
-        });
-      }
-    }
-
-    // Spins
-    for (const s of (allSpins ?? []) as SpinRow[]) {
-      const spinner = s.spinner_id ? userById.get(s.spinner_id) : null;
-      const winner = userById.get(s.winner_id);
-      list.push({
-        key: `spin-${s.id}`,
-        icon: "\uD83C\uDFB0",
-        text: `${spinner?.name ?? "Someone"} spun \u2192 ${winner?.name ?? "Someone"}`,
-        ts: new Date(s.created_at).getTime(),
-        userId: s.spinner_id,
-      });
-    }
-
-    // Itinerary events
-    for (const ev of ((allItinerary ?? []) as ItineraryEventRow[])) {
-      const u = ev.created_by ? userById.get(ev.created_by) : null;
-      list.push({
-        key: `itinerary-${ev.id}`,
-        icon: "\uD83D\uDCCB",
-        text: `New: ${ev.title}${u ? ` (${u.name})` : ""}`,
-        ts: new Date(ev.created_at ?? 0).getTime(),
-        userId: ev.created_by,
-      });
-    }
-
-    list.sort((a, b) => b.ts - a.ts);
-    return list;
-  }, [allDrinks, allVotes, allGames, allGameTotals, allGameScores, allSpins, allItinerary, userById]);
+  const events = useMemo(
+    () =>
+      buildTimelineEvents({
+        users: allUsers ?? [],
+        drinks: allDrinks ?? [],
+        votes: allVotes ?? [],
+        games: allGames ?? [],
+        gameTotals: allGameTotals ?? [],
+        gameScores: allGameScores ?? [],
+        spins: allSpins ?? [],
+        itinerary: allItinerary ?? [],
+      }),
+    [
+      allUsers,
+      allDrinks,
+      allVotes,
+      allGames,
+      allGameTotals,
+      allGameScores,
+      allSpins,
+      allItinerary,
+    ],
+  );
 
   if (loading || !user || !ready) {
     return (
@@ -193,7 +108,7 @@ export default function TimelinePage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm">{ev.text}</p>
                   <p className="text-xs text-muted tabular-nums">
-                    {formatTime(ev.ts, now)}
+                    {formatTimeAgo(ev.ts, now)}
                   </p>
                 </div>
               </div>
@@ -214,16 +129,6 @@ function sameHourBucket(a: number, b: number): boolean {
     da.getDate() === db.getDate() &&
     da.getHours() === db.getHours()
   );
-}
-
-function formatTime(ts: number, now: number): string {
-  const diff = now - ts;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
 }
 
 function formatHour(ts: number, now: number): string {
