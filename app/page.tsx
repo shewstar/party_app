@@ -224,7 +224,7 @@ export default function HomePage() {
         <Tile href="/leaderboards" icon="🏆" label="Leaderboards" sub="Who's winning" />
         <Tile href="/vote" icon="🗳️" label="Vote" sub="Propose rules" badge={newVoteCount} />
         <Tile href="/itinerary" icon="📋" label="Itinerary" sub="What's happening" />
-        <Tile href="/spin" icon="🎡" label="Spin" sub="Pick someone" />
+        <Tile href="/spin" icon="🎰" label="Spin" sub="Pick someone" />
         <Tile
           href="/camera"
           icon="📷"
