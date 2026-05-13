@@ -13,6 +13,7 @@ import { estimateBAC } from "@/lib/bac";
 import { useUser } from "@/lib/user-context";
 import { useAchievements } from "@/lib/achievements-tracker";
 import { useTableData } from "@/lib/realtime-provider";
+import { useOnlineStatus } from "@/lib/offline-queue";
 import { partyDayKey } from "@/lib/recap";
 import type { DrinkRow, DrinksLeaderboardRow, UserRow, VoteTallyRow } from "@/lib/supabase/types";
 
@@ -48,6 +49,7 @@ function timeSince(iso: string | null): string {
 export default function HomePage() {
   const { user, loading } = useUser();
   const { liveEarned } = useAchievements();
+  const { online } = useOnlineStatus();
 
   const { data: allDrinks } = useTableData<DrinkRow>("drink_entries");
   const { data: leaderboard } = useTableData<DrinksLeaderboardRow>("v_drinks_leaderboard");
@@ -150,8 +152,9 @@ export default function HomePage() {
             <div className="text-lg font-semibold">{user.name}</div>
           </div>
         </div>
-        <Link href="/settings" className="text-sm text-muted underline">
+        <Link href="/settings" className="text-sm text-muted underline flex items-center gap-1.5">
           Settings
+          <span className={`inline-block w-2 h-2 rounded-full ${online ? "bg-green-500" : "bg-amber-500"}`} aria-label={online ? "Online" : "Offline"} />
         </Link>
       </header>
 
