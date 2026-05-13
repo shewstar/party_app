@@ -52,9 +52,13 @@ const CATEGORIES: { label: string; ids: string[] }[] = [
       "night-owl",
       "late-starter",
       "cheers-club",
+      "in-sync",
+      "drinking-buddy",
       "heavyweight",
       "peak-performer",
       "iron-liver",
+      "bookends",
+      "light-touch",
       "pacing-yourself",
       "designated-survivor",
       "one-and-done",
@@ -78,6 +82,7 @@ const CATEGORIES: { label: string; ids: string[] }[] = [
     ids: [
       "clutch",
       "triathlete",
+      "gauntlet",
       "net-negative",
       "game-champion",
       "dynasty",
@@ -89,7 +94,14 @@ const CATEGORIES: { label: string; ids: string[] }[] = [
   },
   {
     label: "Spin",
-    ids: ["chosen-one", "magnet", "four-leaf", "spinmeister", "ghosted"],
+    ids: [
+      "chosen-one",
+      "magnet",
+      "four-leaf",
+      "stacked-odds",
+      "spinmeister",
+      "ghosted",
+    ],
   },
   {
     label: "Camera",
@@ -104,7 +116,14 @@ const CATEGORIES: { label: string; ids: string[] }[] = [
   },
   {
     label: "Itinerary",
-    ids: ["hype-buck", "trendsetter", "doom-buck", "reaction-czar", "hyped-up"],
+    ids: [
+      "hype-buck",
+      "trendsetter",
+      "punctual",
+      "doom-buck",
+      "reaction-czar",
+      "hyped-up",
+    ],
   },
   {
     label: "App",
