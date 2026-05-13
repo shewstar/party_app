@@ -8,11 +8,11 @@ import Tile from "@/components/Tile";
 import Avatar from "@/components/Avatar";
 import BACBadge from "@/components/BACBadge";
 import DisclaimerFooter from "@/components/DisclaimerFooter";
-import { SkeletonAvatar, SkeletonBlock, SkeletonCard, SkeletonLine, SkeletonTile } from "@/components/Skeleton";
-import { supabase } from "@/lib/supabase/browser";
+import { SkeletonAvatar, SkeletonCard, SkeletonLine, SkeletonTile } from "@/components/Skeleton";
 import { estimateBAC } from "@/lib/bac";
 import { useUser } from "@/lib/user-context";
 import { useAchievements } from "@/lib/achievements-tracker";
+import { useTableData } from "@/lib/realtime-provider";
 import { partyDayKey } from "@/lib/recap";
 import type { DrinkRow, DrinksLeaderboardRow, UserRow, VoteTallyRow } from "@/lib/supabase/types";
 
@@ -48,94 +48,63 @@ function timeSince(iso: string | null): string {
 export default function HomePage() {
   const { user, loading } = useUser();
   const { liveEarned } = useAchievements();
-  const [myDrinks, setMyDrinks] = useState<DrinkRow[]>([]);
-  const [board, setBoard] = useState<DrinksLeaderboardRow[]>([]);
-  const [forItems, setForItems] = useState<VoteTallyRow[]>([]);
-  const [newVoteCount, setNewVoteCount] = useState(0);
-  const [cameraUsed, setCameraUsed] = useState(0);
-  const [userCount, setUserCount] = useState(0);
-  const [buckUser, setBuckUser] = useState<UserRow | null>(null);
-  const [buckDrinks, setBuckDrinks] = useState<DrinkRow[]>([]);
 
-  async function loadAll(uid?: string) {
-    const s = supabase();
-    const todayKey = partyDayKey(Date.now());
-    const [
-      { data: drinks },
-      { data: lb },
-      { data: tally },
-      { data: voteIds },
-      { data: myResponses },
-      cameraCount,
-      usersCount,
-      { data: buck },
-    ] = await Promise.all([
-      uid
-        ? s.from("drink_entries").select("*").eq("user_id", uid).order("logged_at", { ascending: false })
-        : Promise.resolve({ data: [] as DrinkRow[] }),
-      s.from("v_drinks_leaderboard").select("*").order("drink_count", { ascending: false }).limit(5),
-      s.from("v_vote_tally").select("*").gt("for_count", 0).order("net", { ascending: false }),
-      s.from("vote_items").select("id"),
-      uid
-        ? s.from("vote_responses").select("vote_item_id").eq("user_id", uid)
-        : Promise.resolve({ data: [] as { vote_item_id: string }[] }),
-      uid
-        ? s
-            .from("camera_photos")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", uid)
-            .eq("party_day", todayKey)
-        : Promise.resolve({ count: 0 as number | null }),
-      s.from("users").select("id", { count: "exact", head: true }),
-      s.from("users").select("*").eq("is_buck", true).maybeSingle(),
-    ]);
-    setMyDrinks((drinks ?? []) as DrinkRow[]);
-    setBoard((lb ?? []) as DrinksLeaderboardRow[]);
-    setForItems((tally ?? []) as VoteTallyRow[]);
+  const { data: allDrinks } = useTableData<DrinkRow>("drink_entries");
+  const { data: leaderboard } = useTableData<DrinksLeaderboardRow>("v_drinks_leaderboard");
+  const { data: tally } = useTableData<VoteTallyRow>("v_vote_tally");
+  const { data: allVoteItems } = useTableData<{ id: string }>("vote_items");
+  const { data: allVoteResponses } = useTableData<{ vote_item_id: string; user_id: string }>("vote_responses");
+  const { data: allPhotos } = useTableData<{ id: string; user_id: string; party_day: string }>("camera_photos");
+  const { data: allUsers } = useTableData<UserRow>("users");
+
+  const todayKey = partyDayKey(Date.now());
+
+  const myDrinks = useMemo(
+    () => (allDrinks as DrinkRow[]).filter((d) => d.user_id === user?.id),
+    [allDrinks, user],
+  );
+
+  const board = useMemo(
+    () => [...(leaderboard as DrinksLeaderboardRow[])]
+      .sort((a, b) => b.drink_count - a.drink_count)
+      .slice(0, 5),
+    [leaderboard],
+  );
+
+  const forItems = useMemo(
+    () => (tally as VoteTallyRow[]).filter((v) => v.for_count > 0)
+      .sort((a, b) => b.net - a.net),
+    [tally],
+  );
+
+  const newVoteCount = useMemo(() => {
     const voted = new Set(
-      ((myResponses ?? []) as { vote_item_id: string }[]).map((r) => r.vote_item_id),
+      (allVoteResponses as { vote_item_id: string; user_id: string }[])
+        .filter((r) => r.user_id === user?.id)
+        .map((r) => r.vote_item_id),
     );
-    const unvoted = ((voteIds ?? []) as { id: string }[]).filter((v) => !voted.has(v.id)).length;
-    setNewVoteCount(unvoted);
-    setCameraUsed(cameraCount.count ?? 0);
-    setUserCount(usersCount.count ?? 0);
+    return (allVoteItems as { id: string }[]).filter((v) => !voted.has(v.id)).length;
+  }, [allVoteItems, allVoteResponses, user]);
 
-    const b = (buck ?? null) as UserRow | null;
-    setBuckUser(b);
-    if (b) {
-      const { data: bd } = await s.from("drink_entries").select("*").eq("user_id", b.id).order("logged_at", { ascending: false });
-      setBuckDrinks((bd ?? []) as DrinkRow[]);
-    } else {
-      setBuckDrinks([]);
-    }
-  }
+  const cameraUsed = useMemo(
+    () => (allPhotos as { user_id: string; party_day: string }[])
+      .filter((p) => p.user_id === user?.id && p.party_day === todayKey).length,
+    [allPhotos, user, todayKey],
+  );
 
-  useEffect(() => {
-    if (loading) return;
-    loadAll(user?.id);
-    const s = supabase();
-    const ch = s
-      .channel("home")
-      .on("postgres_changes", { event: "*", schema: "public", table: "drink_entries" }, () =>
-        loadAll(user?.id),
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "vote_items" }, () =>
-        loadAll(user?.id),
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "vote_responses" }, () =>
-        loadAll(user?.id),
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "users" }, () =>
-        loadAll(user?.id),
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "camera_photos" }, () =>
-        loadAll(user?.id),
-      )
-      .subscribe();
-    return () => {
-      s.removeChannel(ch);
-    };
-  }, [loading, user?.id]);
+  const userCount = (allUsers as UserRow[]).length;
+
+  const buckUser = useMemo(
+    () => (allUsers as UserRow[]).find((u) => u.is_buck) ?? null,
+    [allUsers],
+  );
+
+  const buckDrinks = useMemo(
+    () => buckUser
+      ? (allDrinks as DrinkRow[]).filter((d) => d.user_id === buckUser.id)
+      : [],
+    [allDrinks, buckUser],
+  );
 
   const bac = useMemo(
     () => (user ? estimateBAC(user, myDrinks) : { status: "missing_profile" as const }),

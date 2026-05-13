@@ -10,8 +10,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { supabase } from "./supabase/browser";
 import { useUser } from "./user-context";
+import { useTableData, useRealtimeReady } from "./realtime-provider";
 import { partyDayKey, partyDayWindow } from "./recap";
 import { earnedForUser, type EarnedBadge } from "./achievements";
 import type {
@@ -119,74 +119,39 @@ function playAchievementChime() {
 
 export function AchievementsProvider({ children }: { children: ReactNode }) {
   const { user } = useUser();
-  const [users, setUsers] = useState<UserRow[]>([]);
-  const [drinks, setDrinks] = useState<DrinkRow[]>([]);
-  const [voteItems, setVoteItems] = useState<VoteItemRow[]>([]);
-  const [voteResponses, setVoteResponses] = useState<VoteResponseRow[]>([]);
-  const [voteTally, setVoteTally] = useState<VoteTallyRow[]>([]);
-  const [games, setGames] = useState<GameRow[]>([]);
-  const [gamePlayers, setGamePlayers] = useState<GamePlayerRow[]>([]);
-  const [gameScores, setGameScores] = useState<GameScoreRow[]>([]);
-  const [gameTotals, setGameTotals] = useState<GameTotalsRow[]>([]);
-  const [spins, setSpins] = useState<SpinRow[]>([]);
-  const [photos, setPhotos] = useState<CameraPhotoRow[]>([]);
-  const [itineraryEvents, setItineraryEvents] = useState<ItineraryEventRow[]>([]);
-  const [itineraryReactions, setItineraryReactions] = useState<ItineraryReactionRow[]>([]);
-  const [appOpens, setAppOpens] = useState<AppOpenRow[]>([]);
+  const ready = useRealtimeReady();
+  const { data: _users } = useTableData<UserRow>("users");
+  const { data: _drinks } = useTableData<DrinkRow>("drink_entries");
+  const { data: _voteItems } = useTableData<VoteItemRow>("vote_items");
+  const { data: _voteResponses } = useTableData<VoteResponseRow>("vote_responses");
+  const { data: _voteTally } = useTableData<VoteTallyRow>("v_vote_tally");
+  const { data: _games } = useTableData<GameRow>("games");
+  const { data: _gamePlayers } = useTableData<GamePlayerRow>("game_players");
+  const { data: _gameScores } = useTableData<GameScoreRow>("game_scores");
+  const { data: _gameTotals } = useTableData<GameTotalsRow>("v_game_totals");
+  const { data: _spins } = useTableData<SpinRow>("spins");
+  const { data: _photos } = useTableData<CameraPhotoRow>("camera_photos");
+  const { data: _itineraryEvents } = useTableData<ItineraryEventRow>("itinerary_events");
+  const { data: _itineraryReactions } = useTableData<ItineraryReactionRow>("itinerary_reactions");
+  const { data: _appOpens } = useTableData<AppOpenRow>("app_opens");
   const [toasts, setToasts] = useState<EarnedBadge[]>([]);
-  const [ready, setReady] = useState(false);
   const [dayKey, setDayKey] = useState<string>(() => partyDayKey(Date.now()));
   const seenRef = useRef<Set<string>>(new Set());
 
-  const load = useCallback(async () => {
-    const s = supabase();
-    const [
-      { data: u },
-      { data: d },
-      { data: vi },
-      { data: vr },
-      { data: vt },
-      { data: gm },
-      { data: gp },
-      { data: gs },
-      { data: gt },
-      { data: sp },
-      { data: ph },
-      { data: ie },
-      { data: ir },
-      { data: ao },
-    ] = await Promise.all([
-      s.from("users").select("*"),
-      s.from("drink_entries").select("*"),
-      s.from("vote_items").select("*"),
-      s.from("vote_responses").select("*"),
-      s.from("v_vote_tally").select("*"),
-      s.from("games").select("*"),
-      s.from("game_players").select("*"),
-      s.from("game_scores").select("*"),
-      s.from("v_game_totals").select("*"),
-      s.from("spins").select("*"),
-      s.from("camera_photos").select("*"),
-      s.from("itinerary_events").select("*"),
-      s.from("itinerary_reactions").select("*"),
-      s.from("app_opens").select("*"),
-    ]);
-    setUsers((u ?? []) as UserRow[]);
-    setDrinks((d ?? []) as DrinkRow[]);
-    setVoteItems((vi ?? []) as VoteItemRow[]);
-    setVoteResponses((vr ?? []) as VoteResponseRow[]);
-    setVoteTally((vt ?? []) as VoteTallyRow[]);
-    setGames((gm ?? []) as GameRow[]);
-    setGamePlayers((gp ?? []) as GamePlayerRow[]);
-    setGameScores((gs ?? []) as GameScoreRow[]);
-    setGameTotals((gt ?? []) as GameTotalsRow[]);
-    setSpins((sp ?? []) as SpinRow[]);
-    setPhotos((ph ?? []) as CameraPhotoRow[]);
-    setItineraryEvents((ie ?? []) as ItineraryEventRow[]);
-    setItineraryReactions((ir ?? []) as ItineraryReactionRow[]);
-    setAppOpens((ao ?? []) as AppOpenRow[]);
-    setReady(true);
-  }, []);
+  const users = (_users ?? []) as UserRow[];
+  const drinks = (_drinks ?? []) as DrinkRow[];
+  const voteItems = (_voteItems ?? []) as VoteItemRow[];
+  const voteResponses = (_voteResponses ?? []) as VoteResponseRow[];
+  const voteTally = (_voteTally ?? []) as VoteTallyRow[];
+  const games = (_games ?? []) as GameRow[];
+  const gamePlayers = (_gamePlayers ?? []) as GamePlayerRow[];
+  const gameScores = (_gameScores ?? []) as GameScoreRow[];
+  const gameTotals = (_gameTotals ?? []) as GameTotalsRow[];
+  const spins = (_spins ?? []) as SpinRow[];
+  const photos = (_photos ?? []) as CameraPhotoRow[];
+  const itineraryEvents = (_itineraryEvents ?? []) as ItineraryEventRow[];
+  const itineraryReactions = (_itineraryReactions ?? []) as ItineraryReactionRow[];
+  const appOpens = (_appOpens ?? []) as AppOpenRow[];
 
   useEffect(() => {
     if (!user) return;
@@ -194,35 +159,7 @@ export function AchievementsProvider({ children }: { children: ReactNode }) {
     setDayKey(k);
     seenRef.current = loadSeen(user.id, k);
     pruneOldSeen(k);
-    load();
-    const s = supabase();
-    const tables = [
-      "drink_entries",
-      "vote_items",
-      "vote_responses",
-      "games",
-      "game_players",
-      "game_scores",
-      "spins",
-      "camera_photos",
-      "users",
-      "itinerary_events",
-      "itinerary_reactions",
-      "app_opens",
-    ];
-    let ch = s.channel("achievements-tracker");
-    for (const t of tables) {
-      ch = ch.on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: t },
-        () => load(),
-      );
-    }
-    ch.subscribe();
-    return () => {
-      s.removeChannel(ch);
-    };
-  }, [user, load]);
+  }, [user]);
 
   const window = useMemo(() => partyDayWindow(dayKey), [dayKey]);
 

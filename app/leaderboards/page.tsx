@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase/browser";
 import { estimateBAC } from "@/lib/bac";
 import { useUser } from "@/lib/user-context";
 import { SkeletonCard } from "@/components/Skeleton";
+import { useTableData } from "@/lib/realtime-provider";
 import clsx from "@/components/clsx";
 import type {
   DrinkRow,
@@ -59,44 +60,13 @@ const BACStatRow = memo(function BACStatRow({
 export default function LeaderboardsPage() {
   const { user, loading } = useUser();
   const [tab, setTab] = useState<Tab>("drinks");
-  const [users, setUsers] = useState<UserRow[]>([]);
-  const [drinks, setDrinks] = useState<DrinkRow[]>([]);
-  const [drinkBoard, setDrinkBoard] = useState<DrinksLeaderboardRow[]>([]);
-  const [gameTotals, setGameTotals] = useState<GameTotalsRow[]>([]);
-
-  async function load() {
-    const s = supabase();
-    const [{ data: u }, { data: d }, { data: b }, { data: g }] = await Promise.all([
-      s.from("users").select("*"),
-      s.from("drink_entries").select("*"),
-      s.from("v_drinks_leaderboard").select("*"),
-      s.from("v_game_totals").select("*"),
-    ]);
-    setUsers((u ?? []) as UserRow[]);
-    setDrinks((d ?? []) as DrinkRow[]);
-    setDrinkBoard((b ?? []) as DrinksLeaderboardRow[]);
-    setGameTotals((g ?? []) as GameTotalsRow[]);
-  }
-
-  useEffect(() => {
-    if (loading) return;
-    load();
-    const s = supabase();
-    const ch = s
-      .channel("leaderboards")
-      .on("postgres_changes", { event: "*", schema: "public", table: "drink_entries" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "users" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "game_scores" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "games" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "game_players" }, load)
-      .subscribe();
-    return () => {
-      s.removeChannel(ch);
-    };
-  }, [loading]);
+  const { data: users } = useTableData<UserRow>("users");
+  const { data: drinks } = useTableData<DrinkRow>("drink_entries");
+  const { data: drinkBoard } = useTableData<DrinksLeaderboardRow>("v_drinks_leaderboard");
+  const { data: gameTotals } = useTableData<GameTotalsRow>("v_game_totals");
 
   const bacRows = useMemo(() => {
-    return users
+    return (users as UserRow[])
       .map((u) => {
         const userDrinks = drinks.filter((d) => d.user_id === u.id);
         const bac = estimateBAC(u, userDrinks);
@@ -111,7 +81,7 @@ export default function LeaderboardsPage() {
 
   const gameRows = useMemo(() => {
     const byUser = new Map<string, { user_id: string; name: string; avatar_url: string | null; is_buck: boolean; total: number; wins: number }>();
-    for (const u of users) {
+    for (const u of (users as UserRow[])) {
       byUser.set(u.id, { user_id: u.id, name: u.name, avatar_url: u.avatar_url, is_buck: u.is_buck, total: 0, wins: 0 });
     }
     for (const t of gameTotals) {
@@ -137,13 +107,13 @@ export default function LeaderboardsPage() {
 
   const overallRows = useMemo(() => {
     // Combined: normalized rank across drinks count + game wins (lower rank = better).
-    const ids = users.map((u) => u.id);
+    const ids = (users as UserRow[]).map((u) => u.id);
     const drinkOrder = [...drinkBoard].sort((a, b) => b.drink_count - a.drink_count);
     const drinkRankOf = new Map<string, number>();
     drinkOrder.forEach((r, i) => drinkRankOf.set(r.id, i));
     const gameRankOf = new Map<string, number>();
     gameRows.forEach((r, i) => gameRankOf.set(r.user_id, i));
-    return users
+    return (users as UserRow[])
       .map((u) => {
         const dRank = drinkRankOf.get(u.id) ?? ids.length;
         const gRank = gameRankOf.get(u.id) ?? ids.length;

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import TopBar from "@/components/TopBar";
 import Card from "@/components/Card";
@@ -9,6 +9,7 @@ import Chip from "@/components/Chip";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
 import { SkeletonCard } from "@/components/Skeleton";
+import { useTableData } from "@/lib/realtime-provider";
 import type { GameRow, GameTotalsRow, UserRow } from "@/lib/supabase/types";
 
 type GameSummary = GameRow & { totals: GameTotalsRow[] };
@@ -52,43 +53,24 @@ const GameCard = memo(function GameCard({ game }: { game: GameSummary }) {
 
 export default function GamesPage() {
   const { user, loading } = useUser();
-  const [games, setGames] = useState<GameSummary[]>([]);
-  const [members, setMembers] = useState<UserRow[]>([]);
+  const { data: allGames } = useTableData<GameRow>("games");
+  const { data: totals } = useTableData<GameTotalsRow>("v_game_totals");
+  const { data: members } = useTableData<UserRow>("users");
+  const games = useMemo<GameSummary[]>(() => {
+    return [...allGames]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .map((game) => ({
+        ...game,
+        totals: (totals as GameTotalsRow[]).filter((row) => row.game_id === game.id),
+      }));
+  }, [allGames, totals]);
+
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
-  async function load() {
-    const s = supabase();
-    const [{ data: g }, { data: t }, { data: u }] = await Promise.all([
-      s.from("games").select("*").order("created_at", { ascending: false }),
-      s.from("v_game_totals").select("*"),
-      s.from("users").select("*").order("created_at", { ascending: true }),
-    ]);
-    const totals = (t ?? []) as GameTotalsRow[];
-    setGames(
-      ((g ?? []) as GameRow[]).map((game) => ({
-        ...game,
-        totals: totals.filter((row) => row.game_id === game.id),
-      })),
-    );
-    setMembers((u ?? []) as UserRow[]);
-  }
-
   useEffect(() => {
     if (loading) return;
-    load();
-    const s = supabase();
-    const ch = s
-      .channel("games")
-      .on("postgres_changes", { event: "*", schema: "public", table: "games" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "game_players" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "game_scores" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "users" }, load)
-      .subscribe();
-    return () => {
-      s.removeChannel(ch);
-    };
   }, [loading]);
 
   function togglePick(id: string) {

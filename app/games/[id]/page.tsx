@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import TopBar from "@/components/TopBar";
 import Card from "@/components/Card";
@@ -10,19 +10,24 @@ import Chip from "@/components/Chip";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
 import { useHaptic } from "@/lib/haptics";
+import { useTableData } from "@/lib/realtime-provider";
 import type { GameRow, GameTotalsRow, UserRow } from "@/lib/supabase/types";
 
 export default function GameDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user, loading } = useUser();
   const haptic = useHaptic();
+  const { data: allGames } = useTableData<GameRow>("games");
+  const { data: allTotalsRaw } = useTableData<GameTotalsRow>("v_game_totals");
+  const { data: allUsers } = useTableData<UserRow>("users");
   const [game, setGame] = useState<GameRow | null>(null);
   const [totals, setTotals] = useState<GameTotalsRow[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [frozenOrder, setFrozenOrder] = useState<string[] | null>(null);
+  const frozenOrderRef = useRef<string[] | null>(null);
+  frozenOrderRef.current = frozenOrder;
   const resortTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showAddPlayers, setShowAddPlayers] = useState(false);
-  const [members, setMembers] = useState<UserRow[]>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -30,39 +35,6 @@ export default function GameDetailPage() {
       if (resortTimer.current) clearTimeout(resortTimer.current);
     };
   }, []);
-
-  async function load() {
-    if (!id) return;
-    const s = supabase();
-    const [{ data: g }, { data: t }] = await Promise.all([
-      s.from("games").select("*").eq("id", id).maybeSingle(),
-      s.from("v_game_totals").select("*").eq("game_id", id),
-    ]);
-    setGame((g as GameRow) ?? null);
-    setTotals((t ?? []) as GameTotalsRow[]);
-  }
-
-  useEffect(() => {
-    if (loading) return;
-    load();
-    const s = supabase();
-    const ch = s
-      .channel(`game:${id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "game_scores", filter: `game_id=eq.${id}` },
-        load,
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "game_players", filter: `game_id=eq.${id}` },
-        load,
-      )
-      .subscribe();
-    return () => {
-      s.removeChannel(ch);
-    };
-  }, [loading, id]);
 
   async function bump(userId: string, delta: number) {
     if (!game) return;
@@ -93,12 +65,10 @@ export default function GameDetailPage() {
     setBusy(null);
   }
 
+  const members = allUsers as UserRow[];
+
   async function openAddPlayers() {
     setPicked(new Set());
-    if (!showAddPlayers) {
-      const { data } = await supabase().from("users").select("*").order("created_at", { ascending: true });
-      setMembers((data ?? []) as UserRow[]);
-    }
     setShowAddPlayers(!showAddPlayers);
   }
 

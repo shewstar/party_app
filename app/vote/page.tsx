@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
 import { useHaptic } from "@/lib/haptics";
 import { SkeletonCard } from "@/components/Skeleton";
+import { useTableData } from "@/lib/realtime-provider";
 import type { VoteResponseRow, VoteTallyRow } from "@/lib/supabase/types";
 import clsx from "@/components/clsx";
 
@@ -65,6 +66,8 @@ const VoteCard = memo(function VoteCard({
 export default function VotePage() {
   const { user, loading } = useUser();
   const haptic = useHaptic();
+  const { data: tallyRaw } = useTableData<VoteTallyRow>("v_vote_tally");
+  const { data: rawResponses } = useTableData<VoteResponseRow>("vote_responses");
   const [items, setItems] = useState<VoteTallyRow[]>([]);
   const [myVotes, setMyVotes] = useState<Record<string, 1 | -1>>({});
   const myVotesRef = useRef(myVotes);
@@ -77,32 +80,25 @@ export default function VotePage() {
   const [sort, setSort] = useState<SortKey>("newest");
   const [filter, setFilter] = useState<FilterKey>("all");
 
-  async function load() {
-    if (!user) return;
-    const s = supabase();
-    const [{ data: tally }, { data: mine }] = await Promise.all([
-      s.from("v_vote_tally").select("*").order("created_at", { ascending: false }),
-      s.from("vote_responses").select("*").eq("user_id", user.id),
-    ]);
-    setItems((tally ?? []) as VoteTallyRow[]);
-    const map: Record<string, 1 | -1> = {};
-    for (const r of (mine ?? []) as VoteResponseRow[]) map[r.vote_item_id] = r.value;
-    setMyVotes(map);
-  }
+  const tallyData = tallyRaw as VoteTallyRow[];
+  const responses = rawResponses as VoteResponseRow[];
+
+  // Sync items from provider when not in the middle of optimistic update
+  const optimisticRef = useRef(false);
+  useEffect(() => {
+    if (optimisticRef.current) return;
+    setItems([...tallyData].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    ));
+  }, [tallyData]);
 
   useEffect(() => {
-    if (loading || !user) return;
-    load();
-    const s = supabase();
-    const ch = s
-      .channel("vote")
-      .on("postgres_changes", { event: "*", schema: "public", table: "vote_items" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "vote_responses" }, load)
-      .subscribe();
-    return () => {
-      s.removeChannel(ch);
-    };
-  }, [loading, user]);
+    const map: Record<string, 1 | -1> = {};
+    for (const r of responses) {
+      if (r.user_id === user?.id) map[r.vote_item_id] = r.value;
+    }
+    setMyVotes(map);
+  }, [responses, user]);
 
   async function propose(e: React.FormEvent) {
     e.preventDefault();
@@ -130,12 +126,11 @@ export default function VotePage() {
     haptic.medium();
     const previous = myVotesRef.current[item.id];
     if (previous === value) {
-      // Toggle off — delete the response.
+      optimisticRef.current = true;
       setMyVotes((m) => {
         const { [item.id]: _drop, ...rest } = m;
         return rest;
       });
-      // Optimistic tally update.
       setItems((arr) =>
         arr.map((v) =>
           v.id === item.id
@@ -153,7 +148,10 @@ export default function VotePage() {
         .delete()
         .eq("vote_item_id", item.id)
         .eq("user_id", user.id);
+      optimisticRef.current = false;
+      return;
     }
+    optimisticRef.current = true;
     setMyVotes((m) => ({ ...m, [item.id]: value }));
     setItems((arr) =>
       arr.map((v) => {
@@ -172,7 +170,7 @@ export default function VotePage() {
         { vote_item_id: item.id, user_id: user.id, value, updated_at: new Date().toISOString() },
         { onConflict: "vote_item_id,user_id" },
       );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    optimisticRef.current = false;
   }, [user, haptic]);
 
   const filtered = useMemo(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import TopBar from "@/components/TopBar";
 import Card from "@/components/Card";
 import BigButton from "@/components/BigButton";
@@ -8,6 +8,7 @@ import Avatar from "@/components/Avatar";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
 import { SkeletonCard } from "@/components/Skeleton";
+import { useTableData } from "@/lib/realtime-provider";
 import type { ItineraryEventRow, ItineraryReactionRow, UserRow } from "@/lib/supabase/types";
 
 const REACTIONS = ["👍", "😂", "🍻", "🔥", "🎉", "💀"];
@@ -31,9 +32,17 @@ function toLocalInput(iso: string): string {
 
 export default function ItineraryPage() {
   const { user, loading } = useUser();
-  const [events, setEvents] = useState<ItineraryEventRow[]>([]);
+  const { data: events } = useTableData<ItineraryEventRow>("itinerary_events");
+  const { data: users } = useTableData<UserRow>("users");
   const [reactions, setReactions] = useState<ItineraryReactionRow[]>([]);
-  const [users, setUsers] = useState<UserRow[]>([]);
+
+  useEffect(() => {
+    if (loading) return;
+    const s = supabase();
+    s.from("itinerary_reactions").select("*").then(({ data }) => {
+      setReactions((data ?? []) as ItineraryReactionRow[]);
+    });
+  }, [loading]);
 
   // Form state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -45,28 +54,17 @@ export default function ItineraryPage() {
   const [end, setEnd] = useState("");
   const [saving, setSaving] = useState(false);
 
-  async function load() {
-    const s = supabase();
-    const [{ data: evts }, { data: reacts }, { data: usrs }] = await Promise.all([
-      s.from("itinerary_events").select("*").order("start_time", { ascending: true, nullsFirst: false }).order("sort_order", { ascending: true }),
-      s.from("itinerary_reactions").select("*"),
-      s.from("users").select("*").order("name"),
-    ]);
-    setEvents((evts ?? []) as ItineraryEventRow[]);
-    setReactions((reacts ?? []) as ItineraryReactionRow[]);
-    setUsers((usrs ?? []) as UserRow[]);
-  }
+  const sortedEvents = useMemo(() => {
+    return [...events].sort((a, b) => {
+      const aStart = a.start_time ? new Date(a.start_time).getTime() : 0;
+      const bStart = b.start_time ? new Date(b.start_time).getTime() : 0;
+      if (aStart !== bStart) return aStart - bStart;
+      return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+    });
+  }, [events]);
 
   useEffect(() => {
     if (loading) return;
-    load();
-    const s = supabase();
-    const ch = s
-      .channel("itinerary")
-      .on("postgres_changes", { event: "*", schema: "public", table: "itinerary_events" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "itinerary_reactions" }, load)
-      .subscribe();
-    return () => { s.removeChannel(ch); };
   }, [loading]);
 
   const reactionMap: Record<string, Record<string, { count: number; hasMine: boolean }>> = {};
@@ -231,7 +229,7 @@ export default function ItineraryPage() {
         )}
 
         <div className="flex flex-col gap-3">
-          {events.map(evt => {
+          {sortedEvents.map(evt => {
             const evtReactions = reactionMap[evt.id] ?? {};
             const creator = users.find(u => u.id === evt.created_by);
             const isEditing = editingId === evt.id;

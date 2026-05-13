@@ -13,6 +13,7 @@ import { supabase } from "./supabase/browser";
 import type { UserRow } from "./supabase/types";
 import { getOrCreateUserId, getUserId } from "./session";
 import { partyDayKey } from "./recap";
+import { useTableData, useRealtimeReady } from "./realtime-provider";
 
 const APP_OPEN_THROTTLE_MS = 5 * 60 * 1000;
 const APP_OPEN_KEY_PREFIX = "lastAppOpen";
@@ -49,16 +50,11 @@ const UserContext = createContext<Ctx>({
 export function UserProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const providerReady = useRealtimeReady();
+  const { data: allUsers } = useTableData<UserRow>("users");
   const [userId, setUserId] = useState<string | null>(null);
   const [user, setUser] = useState<UserRow | null>(null);
   const [loading, setLoading] = useState(true);
-
-  async function loadUser(id: string) {
-    const { data, error } = await supabase().from("users").select("*").eq("id", id).maybeSingle();
-    if (error) return null;
-    if (data) setUser(data);
-    return data;
-  }
 
   useEffect(() => {
     const id = getUserId();
@@ -67,9 +63,17 @@ export function UserProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-    loadUser(id).finally(() => setLoading(false));
     logAppOpen(id);
+    // User will be found from provider cache once ready
   }, []);
+
+  // Look up user from provider cache
+  useEffect(() => {
+    if (!providerReady || !userId) return;
+    const found = (allUsers as UserRow[]).find((u) => u.id === userId) ?? null;
+    setUser(found);
+    setLoading(false);
+  }, [providerReady, allUsers, userId]);
 
   useEffect(() => {
     if (loading) return;
@@ -77,21 +81,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
       router.replace("/onboarding");
     }
   }, [loading, user, pathname, router]);
-
-  useEffect(() => {
-    if (!userId) return;
-    const ch = supabase()
-      .channel(`user:${userId}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "users", filter: `id=eq.${userId}` },
-        (payload) => setUser(payload.new as UserRow),
-      )
-      .subscribe();
-    return () => {
-      supabase().removeChannel(ch);
-    };
-  }, [userId]);
 
   const value = useMemo<Ctx>(
     () => ({
@@ -105,7 +94,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
           setUser(null);
           return;
         }
-        await loadUser(id);
+        const found = (allUsers as UserRow[]).find((u) => u.id === id) ?? null;
+        setUser(found || user);
       },
     }),
     [userId, user, loading],

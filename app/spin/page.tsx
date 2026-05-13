@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
 import { useHaptic } from "@/lib/haptics";
 import { SkeletonCard } from "@/components/Skeleton";
+import { useTableData } from "@/lib/realtime-provider";
 import type { UserRow } from "@/lib/supabase/types";
 
 const WHEEL_COLORS = [
@@ -51,35 +52,13 @@ function initialsOf(name: string) {
 export default function SpinPage() {
   const { user, loading } = useUser();
   const haptic = useHaptic();
-  const [members, setMembers] = useState<UserRow[]>([]);
+  const { data: members } = useTableData<UserRow>("users");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [winner, setWinner] = useState<UserRow | null>(null);
   const initialisedRef = useRef(false);
-
-  async function load() {
-    const s = supabase();
-    const { data } = await s
-      .from("users")
-      .select("*")
-      .order("created_at", { ascending: true });
-    setMembers((data ?? []) as UserRow[]);
-  }
-
-  useEffect(() => {
-    if (loading) return;
-    load();
-    const s = supabase();
-    const ch = s
-      .channel("spin-members")
-      .on("postgres_changes", { event: "*", schema: "public", table: "users" }, load)
-      .subscribe();
-    return () => {
-      s.removeChannel(ch);
-    };
-  }, [loading]);
 
   useEffect(() => {
     if (initialisedRef.current || members.length === 0) return;

@@ -1,17 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TopBar from "@/components/TopBar";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
 import { useHaptic } from "@/lib/haptics";
+import { useTableData } from "@/lib/realtime-provider";
 import { partyDayKey } from "@/lib/recap";
 import {
   applyDisposableFilter,
   pickFilterVariant,
   playShutterSound,
 } from "@/lib/disposable-filter";
+import type { CameraPhotoRow } from "@/lib/supabase/types";
 
 const DAILY_LIMIT = 3;
 
@@ -22,7 +24,7 @@ export default function CameraPage() {
   const viewRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [viewDims, setViewDims] = useState({ w: 0, h: 0 });
-  const [usedToday, setUsedToday] = useState<number | null>(null);
+  const { data: allPhotos } = useTableData<CameraPhotoRow>("camera_photos");
   const [capturing, setCapturing] = useState(false);
   const [flashing, setFlashing] = useState(false);
   const [facing, setFacing] = useState<"environment" | "user">("environment");
@@ -30,6 +32,10 @@ export default function CameraPage() {
   const [permissionAsked, setPermissionAsked] = useState(false);
 
   const todayKey = partyDayKey(Date.now());
+  const usedToday = useMemo(() => {
+    if (!user) return null;
+    return allPhotos.filter((p) => p.user_id === user.id && p.party_day === todayKey).length;
+  }, [allPhotos, user, todayKey]);
   const remaining = usedToday === null ? null : Math.max(0, DAILY_LIMIT - usedToday);
   const outOfFilm = usedToday !== null && usedToday >= DAILY_LIMIT;
 
@@ -87,36 +93,6 @@ export default function CameraPage() {
     return () => ro.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (!user) return;
-    const s = supabase();
-    let cancelled = false;
-
-    async function loadCount() {
-      if (!user) return;
-      const { count } = await s
-        .from("camera_photos")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("party_day", todayKey);
-      if (!cancelled) setUsedToday(count ?? 0);
-    }
-    loadCount();
-
-    const ch = s
-      .channel(`camera-${user.id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "camera_photos", filter: `user_id=eq.${user.id}` },
-        () => loadCount(),
-      )
-      .subscribe();
-    return () => {
-      cancelled = true;
-      s.removeChannel(ch);
-    };
-  }, [user, todayKey]);
-
   async function shoot() {
     if (!user || !videoRef.current || capturing || outOfFilm) return;
     const video = videoRef.current;
@@ -148,7 +124,6 @@ export default function CameraPage() {
         filter_variant: variant,
       });
       if (insErr) throw insErr;
-      setUsedToday((n) => (n === null ? 1 : n + 1));
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Capture failed";
       setError(msg);

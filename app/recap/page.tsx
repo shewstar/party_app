@@ -26,6 +26,7 @@ import {
 import { earnedForUser, evaluateAchievements } from "@/lib/achievements";
 import { useUser } from "@/lib/user-context";
 import { SkeletonCard } from "@/components/Skeleton";
+import { useTableData } from "@/lib/realtime-provider";
 import type {
   AppOpenRow,
   CameraPhotoRow,
@@ -80,80 +81,42 @@ function RecapPageInner() {
   const [itineraryEvents, setItineraryEvents] = useState<ItineraryEventRow[]>([]);
   const [itineraryReactions, setItineraryReactions] = useState<ItineraryReactionRow[]>([]);
   const [appOpens, setAppOpens] = useState<AppOpenRow[]>([]);
+
+  // Sync from provider cache
+  const { data: uData } = useTableData<UserRow>("users");
+  const { data: dData } = useTableData<DrinkRow>("drink_entries");
+  const { data: gData } = useTableData<GameRow>("games");
+  const { data: gtData } = useTableData<GameTotalsRow>("v_game_totals");
+  const { data: gpData } = useTableData<GamePlayerRow>("game_players");
+  const { data: gsData } = useTableData<GameScoreRow>("game_scores");
+  const { data: viData } = useTableData<VoteItemRow>("vote_items");
+  const { data: vrData } = useTableData<VoteResponseRow>("vote_responses");
+  const { data: vtData } = useTableData<VoteTallyRow>("v_vote_tally");
+  const { data: spData } = useTableData<SpinRow>("spins");
+  const { data: phData } = useTableData<CameraPhotoRow>("camera_photos");
+  const { data: ieData } = useTableData<ItineraryEventRow>("itinerary_events");
+  const { data: irData } = useTableData<ItineraryReactionRow>("itinerary_reactions");
+  const { data: aoData } = useTableData<AppOpenRow>("app_opens");
+
+  useEffect(() => { setUsers(uData as UserRow[]); }, [uData]);
+  useEffect(() => { setDrinks(dData as DrinkRow[]); }, [dData]);
+  useEffect(() => { setGames(gData as GameRow[]); }, [gData]);
+  useEffect(() => { setGameTotals(gtData as GameTotalsRow[]); }, [gtData]);
+  useEffect(() => { setGamePlayers(gpData as GamePlayerRow[]); }, [gpData]);
+  useEffect(() => { setGameScores(gsData as GameScoreRow[]); }, [gsData]);
+  useEffect(() => { setVoteItems(viData as VoteItemRow[]); }, [viData]);
+  useEffect(() => { setVoteResponses(vrData as VoteResponseRow[]); }, [vrData]);
+  useEffect(() => { setVoteTally(vtData as VoteTallyRow[]); }, [vtData]);
+  useEffect(() => { setSpins(spData as SpinRow[]); }, [spData]);
+  useEffect(() => { setPhotos(phData as CameraPhotoRow[]); }, [phData]);
+  useEffect(() => { setItineraryEvents(ieData as ItineraryEventRow[]); }, [ieData]);
+  useEffect(() => { setItineraryReactions(irData as ItineraryReactionRow[]); }, [irData]);
+  useEffect(() => { setAppOpens(aoData as AppOpenRow[]); }, [aoData]);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
-  async function load() {
-    const s = supabase();
-    const [
-      { data: u },
-      { data: d },
-      { data: gm },
-      { data: g },
-      { data: gpr },
-      { data: gsc },
-      { data: vi },
-      { data: vr },
-      { data: vt },
-      { data: sp },
-      { data: ph },
-      { data: ie },
-      { data: ir },
-      { data: ao },
-    ] = await Promise.all([
-      s.from("users").select("*"),
-      s.from("drink_entries").select("*"),
-      s.from("games").select("*"),
-      s.from("v_game_totals").select("*"),
-      s.from("game_players").select("*"),
-      s.from("game_scores").select("*"),
-      s.from("vote_items").select("*"),
-      s.from("vote_responses").select("*"),
-      s.from("v_vote_tally").select("*"),
-      s.from("spins").select("*"),
-      s.from("camera_photos").select("*"),
-      s.from("itinerary_events").select("*"),
-      s.from("itinerary_reactions").select("*"),
-      s.from("app_opens").select("*"),
-    ]);
-    setUsers((u ?? []) as UserRow[]);
-    setDrinks((d ?? []) as DrinkRow[]);
-    setGames((gm ?? []) as GameRow[]);
-    setGameTotals((g ?? []) as GameTotalsRow[]);
-    setGamePlayers((gpr ?? []) as GamePlayerRow[]);
-    setGameScores((gsc ?? []) as GameScoreRow[]);
-    setVoteItems((vi ?? []) as VoteItemRow[]);
-    setVoteResponses((vr ?? []) as VoteResponseRow[]);
-    setVoteTally((vt ?? []) as VoteTallyRow[]);
-    setSpins((sp ?? []) as SpinRow[]);
-    setPhotos((ph ?? []) as CameraPhotoRow[]);
-    setItineraryEvents((ie ?? []) as ItineraryEventRow[]);
-    setItineraryReactions((ir ?? []) as ItineraryReactionRow[]);
-    setAppOpens((ao ?? []) as AppOpenRow[]);
-  }
-
   useEffect(() => {
     if (loading) return;
-    load();
-    const s = supabase();
-    const ch = s
-      .channel("recap")
-      .on("postgres_changes", { event: "*", schema: "public", table: "drink_entries" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "users" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "game_scores" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "games" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "game_players" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "vote_items" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "vote_responses" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "spins" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "camera_photos" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "itinerary_events" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "itinerary_reactions" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "app_opens" }, load)
-      .subscribe();
-    return () => {
-      s.removeChannel(ch);
-    };
   }, [loading]);
 
   const todayKey = useMemo(() => partyDayKey(Date.now()), []);
