@@ -36,6 +36,7 @@ export default function HomePage() {
   const [forItems, setForItems] = useState<VoteTallyRow[]>([]);
   const [newVoteCount, setNewVoteCount] = useState(0);
   const [cameraUsed, setCameraUsed] = useState(0);
+  const [userCount, setUserCount] = useState(0);
   const [buckUser, setBuckUser] = useState<UserRow | null>(null);
   const [buckDrinks, setBuckDrinks] = useState<DrinkRow[]>([]);
 
@@ -49,13 +50,14 @@ export default function HomePage() {
       { data: voteIds },
       { data: myResponses },
       cameraCount,
+      usersCount,
       { data: buck },
     ] = await Promise.all([
       uid
         ? s.from("drink_entries").select("*").eq("user_id", uid).order("logged_at", { ascending: false })
         : Promise.resolve({ data: [] as DrinkRow[] }),
       s.from("v_drinks_leaderboard").select("*").order("drink_count", { ascending: false }).limit(5),
-      s.from("v_vote_tally").select("*").gt("net", 0).order("net", { ascending: false }),
+      s.from("v_vote_tally").select("*").gt("for_count", 0).order("net", { ascending: false }),
       s.from("vote_items").select("id"),
       uid
         ? s.from("vote_responses").select("vote_item_id").eq("user_id", uid)
@@ -67,6 +69,7 @@ export default function HomePage() {
             .eq("user_id", uid)
             .eq("party_day", todayKey)
         : Promise.resolve({ count: 0 as number | null }),
+      s.from("users").select("id", { count: "exact", head: true }),
       s.from("users").select("*").eq("is_buck", true).maybeSingle(),
     ]);
     setMyDrinks((drinks ?? []) as DrinkRow[]);
@@ -78,6 +81,7 @@ export default function HomePage() {
     const unvoted = ((voteIds ?? []) as { id: string }[]).filter((v) => !voted.has(v.id)).length;
     setNewVoteCount(unvoted);
     setCameraUsed(cameraCount.count ?? 0);
+    setUserCount(usersCount.count ?? 0);
 
     const b = (buck ?? null) as UserRow | null;
     setBuckUser(b);
@@ -234,6 +238,37 @@ export default function HomePage() {
         <Tile href="/recap" icon="🏁" label="Recap" sub="End-of-night stats" className="col-span-2" />
       </div>
 
+      {(() => {
+        const majorityItems = forItems.filter((v) => v.for_count > userCount / 2);
+        return (
+          <Card>
+            <div className="flex items-baseline justify-between mb-3">
+              <h2 className="font-semibold">Voted in</h2>
+              <Link href="/vote" className="text-sm text-accent">
+                Vote →
+              </Link>
+            </div>
+            {majorityItems.length === 0 ? (
+              <p className="text-sm text-muted">Nothing has been voted in yet.</p>
+            ) : (
+              <ul className="flex flex-col gap-2 max-h-72 overflow-y-auto">
+                {majorityItems.map((v) => (
+                  <li
+                    key={v.id}
+                    className="flex items-center justify-between gap-3 border border-line rounded-card px-3 py-2 bg-surface2"
+                  >
+                    <span className="text-sm">{v.text}</span>
+                    <span className="text-xs text-accent font-semibold tabular-nums">
+                      +{v.net}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        );
+      })()}
+
       <Card>
         <div className="flex items-baseline justify-between mb-3">
           <h2 className="font-semibold">Drinks leaderboard</h2>
@@ -252,32 +287,6 @@ export default function HomePage() {
             </li>
           ))}
         </ul>
-      </Card>
-
-      <Card>
-        <div className="flex items-baseline justify-between mb-3">
-          <h2 className="font-semibold">Voted in</h2>
-          <Link href="/vote" className="text-sm text-accent">
-            Vote →
-          </Link>
-        </div>
-        {forItems.length === 0 ? (
-          <p className="text-sm text-muted">Nothing has been voted in yet.</p>
-        ) : (
-          <ul className="flex flex-col gap-2 max-h-72 overflow-y-auto">
-            {forItems.map((v) => (
-              <li
-                key={v.id}
-                className="flex items-center justify-between gap-3 border border-line rounded-card px-3 py-2 bg-surface2"
-              >
-                <span className="text-sm">{v.text}</span>
-                <span className="text-xs text-accent font-semibold tabular-nums">
-                  +{v.net}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
       </Card>
 
       <DisclaimerFooter />
