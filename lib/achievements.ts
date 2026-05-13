@@ -63,8 +63,12 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "night-owl", title: "Night Owl", blurb: "Drink logged after 2am.", icon: "🌅", tier: "fun", timing: "live" },
   { id: "late-starter", title: "Late Starter", blurb: "First drink after 10pm.", icon: "🦇", tier: "fun", timing: "live" },
   { id: "cheers-club", title: "Cheers Club", blurb: "Matched another buck's drink.", icon: "🍻", tier: "fun", timing: "live" },
+  { id: "in-sync", title: "In Sync", blurb: "Logged a drink within 60s of another buck.", icon: "🥂", tier: "fun", timing: "live" },
+  { id: "drinking-buddy", title: "Drinking Buddy", blurb: "Matched 3+ different drinks with other bucks.", icon: "👯", tier: "win", timing: "live" },
   // Drinks — end-of-day
   { id: "heavyweight", title: "Heavyweight", blurb: "Most standard drinks of the night.", icon: "🧱", tier: "win", timing: "endOfDay" },
+  { id: "light-touch", title: "Light Touch", blurb: "3+ drinks, every one under 4% ABV.", icon: "🍃", tier: "fun", timing: "endOfDay" },
+  { id: "bookends", title: "Bookends", blurb: "First and last drink of the night.", icon: "🌗", tier: "win", timing: "endOfDay" },
   { id: "peak-performer", title: "Peak Performer", blurb: "Highest peak BAC of the night.", icon: "📈", tier: "win", timing: "endOfDay" },
   { id: "pacing-yourself", title: "Pacing Yourself", blurb: "Only 1–2 drinks all night.", icon: "🐢", tier: "fail", timing: "endOfDay" },
   { id: "designated-survivor", title: "Designated Survivor", blurb: "No drinks logged tonight.", icon: "🥛", tier: "fail", timing: "endOfDay" },
@@ -83,6 +87,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   // Games — live
   { id: "clutch", title: "Clutch", blurb: "Leading a game by exactly 1.", icon: "🎯", tier: "win", timing: "live" },
   { id: "triathlete", title: "Triathlete", blurb: "Joined 3+ games.", icon: "🎮", tier: "win", timing: "live" },
+  { id: "gauntlet", title: "Gauntlet", blurb: "Joined 10+ games.", icon: "🕹️", tier: "win", timing: "live" },
   { id: "net-negative", title: "Net Negative", blurb: "Game score dropped below zero.", icon: "🤡", tier: "fail", timing: "live" },
   // Games — end-of-day
   { id: "game-champion", title: "Game Champion", blurb: "Most game wins tonight.", icon: "🏆", tier: "win", timing: "endOfDay" },
@@ -94,6 +99,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "chosen-one", title: "Chosen One", blurb: "Picked by the wheel.", icon: "🎡", tier: "fun", timing: "live" },
   { id: "magnet", title: "Magnet", blurb: "Picked 3+ times tonight.", icon: "🎯", tier: "fun", timing: "live" },
   { id: "spinmeister", title: "Spinmeister", blurb: "Spun the wheel 5+ times.", icon: "🌪️", tier: "fun", timing: "live" },
+  { id: "stacked-odds", title: "Stacked Odds", blurb: "Picked 10+ times in pools of 5+ bucks.", icon: "🎰", tier: "win", timing: "live" },
   // Spin — end-of-day
   { id: "ghosted", title: "Ghosted", blurb: "In 5+ pools, picked zero times.", icon: "👻", tier: "fail", timing: "endOfDay" },
 
@@ -111,6 +117,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "trendsetter", title: "Trendsetter", blurb: "First to react to an event.", icon: "✨", tier: "fun", timing: "live" },
   { id: "doom-buck", title: "Doom Buck", blurb: "Dropped the 💀 reaction.", icon: "💀", tier: "fun", timing: "live" },
   { id: "reaction-czar", title: "Reaction Czar", blurb: "Used all 6 emoji reactions.", icon: "🌈", tier: "win", timing: "live" },
+  { id: "punctual", title: "Punctual", blurb: "Reacted within 10 min of an event being posted.", icon: "⏱️", tier: "fun", timing: "live" },
   // Itinerary — end-of-day
   { id: "hyped-up", title: "Hyped Up", blurb: "Reacted to every event tonight.", icon: "🎉", tier: "win", timing: "endOfDay" },
 
@@ -233,7 +240,28 @@ export function earnedForUser(
         (d) => d.user_id !== userId && d.label && myLabels.has(d.label),
       );
       if (matched) out.push(make("cheers-club", userId));
+      const sharedLabels = new Set<string>();
+      for (const lbl of myLabels) {
+        if (
+          ctx.drinks.some((d) => d.user_id !== userId && d.label === lbl)
+        ) {
+          sharedLabels.add(lbl);
+        }
+      }
+      if (sharedLabels.size >= 3) {
+        out.push(make("drinking-buddy", userId, `${sharedLabels.size} shared`));
+      }
     }
+    const SIXTY_SEC = 60 * 1000;
+    const inSync = userDrinks.some((my) => {
+      const myT = new Date(my.logged_at).getTime();
+      return ctx.drinks.some(
+        (d) =>
+          d.user_id !== userId &&
+          Math.abs(new Date(d.logged_at).getTime() - myT) <= SIXTY_SEC,
+      );
+    });
+    if (inSync) out.push(make("in-sync", userId, "within 60s"));
   }
 
   // ── DRINKS (end-of-day) ────────────────────────────────────────────────
@@ -288,6 +316,21 @@ export function earnedForUser(
       const earlyHour = h >= 5 && h < 21;
       if (earlyHour) out.push(make("one-and-done", userId, "before 9pm"));
     }
+    if (drinkCount >= 3 && userDrinks.every((d) => Number(d.abv) < 0.04)) {
+      out.push(make("light-touch", userId, "all <4% abv"));
+    }
+    if (drinkCount >= 1 && ctx.drinks.length >= 2 && firstDrinkMs !== null && lastDrinkMs !== null) {
+      const allTimes = ctx.drinks.map((d) => new Date(d.logged_at).getTime());
+      const earliestAll = Math.min(...allTimes);
+      const latestAll = Math.max(...allTimes);
+      if (
+        firstDrinkMs === earliestAll &&
+        lastDrinkMs === latestAll &&
+        earliestAll !== latestAll
+      ) {
+        out.push(make("bookends", userId, "first & last"));
+      }
+    }
   }
 
   // ── VOTES ──────────────────────────────────────────────────────────────
@@ -341,6 +384,9 @@ export function earnedForUser(
   if (wantLive) {
     if (myGames.length >= 3) {
       out.push(make("triathlete", userId, `${myGames.length} games`));
+    }
+    if (myGames.length >= 10) {
+      out.push(make("gauntlet", userId, `${myGames.length} games`));
     }
     // Clutch — leading by exactly 1 in any game
     for (const gameId of myGameIds) {
@@ -452,6 +498,10 @@ export function earnedForUser(
     if (wonSpins.length >= 5) {
       out.push(make("four-leaf", userId, `${wonSpins.length}× picked`));
     }
+    const bigPoolWins = wonSpins.filter((s) => s.pool.length > 4).length;
+    if (bigPoolWins >= 10) {
+      out.push(make("stacked-odds", userId, `${bigPoolWins}× in 5+ pools`));
+    }
     if (spunByMe.length >= 5) {
       out.push(make("spinmeister", userId, `${spunByMe.length} spins`));
     }
@@ -513,6 +563,15 @@ export function earnedForUser(
         out.push(make("trendsetter", userId, "first react", evt.id));
       }
     }
+    const TEN_MIN = 10 * 60 * 1000;
+    const punctual = myReactions.some((r) => {
+      const evt = ctx.itineraryEvents.find((e) => e.id === r.event_id);
+      if (!evt) return false;
+      const delta =
+        new Date(r.created_at).getTime() - new Date(evt.created_at).getTime();
+      return delta >= 0 && delta <= TEN_MIN;
+    });
+    if (punctual) out.push(make("punctual", userId, "<10 min"));
   }
   if (wantEnd) {
     if (ctx.itineraryEvents.length >= 2) {
