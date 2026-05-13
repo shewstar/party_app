@@ -70,7 +70,7 @@ Triggers: new vote proposal, vote passes majority, itinerary event added, buck h
    - `vote_items` · INSERT → `https://YOUR-APP/api/push/events/vote-created`
    - `vote_responses` · INSERT and UPDATE → `https://YOUR-APP/api/push/events/vote-passed`
    - `itinerary_events` · INSERT → `https://YOUR-APP/api/push/events/itinerary-added`
-4. Deploy. The `vercel.json` cron entry hits `/api/cron/buck-dry-check` hourly. Vercel signs cron requests with the project's `CRON_SECRET`, so set it in Vercel env vars too.
+4. Deploy. The buck-dry check runs hourly via [.github/workflows/buck-dry-check.yml](.github/workflows/buck-dry-check.yml) — in the repo's GitHub **Settings → Secrets and variables → Actions**, add `CRON_SECRET` (matching the value in your Vercel env) and `APP_URL` (e.g. `https://your-app.vercel.app`).
 5. iOS users must Add to Home Screen before push works — the banner detects iOS Safari and shows the install hint automatically.
 
 ## Notes
