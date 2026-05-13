@@ -54,14 +54,14 @@ export function enqueueWrite(table: string, payload: Record<string, unknown>) {
 }
 
 export function useOnlineStatus() {
-  const [online, setOnline] = useState(
-    typeof navigator !== "undefined" ? navigator.onLine : true,
-  );
+  const [online, setOnline] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setOnline(navigator.onLine);
+    setMounted(true);
     const goOnline = () => {
       setOnline(true);
-      // attempt drain on reconnect
       drainOfflineQueue(async (table, payload) => {
         try {
           const { supabase } = await import("@/lib/supabase/browser");
@@ -87,5 +87,5 @@ export function useOnlineStatus() {
     return true;
   }, [online]);
 
-  return { online, enqueue };
+  return { online: mounted ? online : true, enqueue };
 }
