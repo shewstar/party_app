@@ -56,6 +56,10 @@ const ALL_TABLES: TableName[] = [
 
 type Cache = Map<TableName, unknown[]>;
 
+// Stable reference returned when a table hasn't been cached yet — prevents
+// dependency churn for consumers that put `data` in a useEffect dep array.
+const EMPTY: unknown[] = [];
+
 type Listener = () => void;
 
 type RealtimeCtx = {
@@ -178,7 +182,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
   const getTable = useCallback(
     <T,>(table: TableName): T[] => {
-      return (cacheRef.current.get(table) ?? []) as T[];
+      return (cacheRef.current.get(table) ?? EMPTY) as T[];
     },
     [],
   );

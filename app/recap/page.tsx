@@ -67,57 +67,22 @@ function RecapPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [users, setUsers] = useState<UserRow[]>([]);
-  const [drinks, setDrinks] = useState<DrinkRow[]>([]);
-  const [games, setGames] = useState<GameRow[]>([]);
-  const [gameTotals, setGameTotals] = useState<GameTotalsRow[]>([]);
-  const [gamePlayers, setGamePlayers] = useState<GamePlayerRow[]>([]);
-  const [gameScores, setGameScores] = useState<GameScoreRow[]>([]);
-  const [voteItems, setVoteItems] = useState<VoteItemRow[]>([]);
-  const [voteResponses, setVoteResponses] = useState<VoteResponseRow[]>([]);
-  const [voteTally, setVoteTally] = useState<VoteTallyRow[]>([]);
-  const [spins, setSpins] = useState<SpinRow[]>([]);
-  const [photos, setPhotos] = useState<CameraPhotoRow[]>([]);
-  const [itineraryEvents, setItineraryEvents] = useState<ItineraryEventRow[]>([]);
-  const [itineraryReactions, setItineraryReactions] = useState<ItineraryReactionRow[]>([]);
-  const [appOpens, setAppOpens] = useState<AppOpenRow[]>([]);
-
-  // Sync from provider cache
-  const { data: uData } = useTableData<UserRow>("users");
-  const { data: dData } = useTableData<DrinkRow>("drink_entries");
-  const { data: gData } = useTableData<GameRow>("games");
-  const { data: gtData } = useTableData<GameTotalsRow>("v_game_totals");
-  const { data: gpData } = useTableData<GamePlayerRow>("game_players");
-  const { data: gsData } = useTableData<GameScoreRow>("game_scores");
-  const { data: viData } = useTableData<VoteItemRow>("vote_items");
-  const { data: vrData } = useTableData<VoteResponseRow>("vote_responses");
-  const { data: vtData } = useTableData<VoteTallyRow>("v_vote_tally");
-  const { data: spData } = useTableData<SpinRow>("spins");
-  const { data: phData } = useTableData<CameraPhotoRow>("camera_photos");
-  const { data: ieData } = useTableData<ItineraryEventRow>("itinerary_events");
-  const { data: irData } = useTableData<ItineraryReactionRow>("itinerary_reactions");
-  const { data: aoData } = useTableData<AppOpenRow>("app_opens");
-
-  useEffect(() => { setUsers(uData as UserRow[]); }, [uData]);
-  useEffect(() => { setDrinks(dData as DrinkRow[]); }, [dData]);
-  useEffect(() => { setGames(gData as GameRow[]); }, [gData]);
-  useEffect(() => { setGameTotals(gtData as GameTotalsRow[]); }, [gtData]);
-  useEffect(() => { setGamePlayers(gpData as GamePlayerRow[]); }, [gpData]);
-  useEffect(() => { setGameScores(gsData as GameScoreRow[]); }, [gsData]);
-  useEffect(() => { setVoteItems(viData as VoteItemRow[]); }, [viData]);
-  useEffect(() => { setVoteResponses(vrData as VoteResponseRow[]); }, [vrData]);
-  useEffect(() => { setVoteTally(vtData as VoteTallyRow[]); }, [vtData]);
-  useEffect(() => { setSpins(spData as SpinRow[]); }, [spData]);
-  useEffect(() => { setPhotos(phData as CameraPhotoRow[]); }, [phData]);
-  useEffect(() => { setItineraryEvents(ieData as ItineraryEventRow[]); }, [ieData]);
-  useEffect(() => { setItineraryReactions(irData as ItineraryReactionRow[]); }, [irData]);
-  useEffect(() => { setAppOpens(aoData as AppOpenRow[]); }, [aoData]);
+  const { data: users } = useTableData<UserRow>("users");
+  const { data: drinks } = useTableData<DrinkRow>("drink_entries");
+  const { data: games } = useTableData<GameRow>("games");
+  const { data: gameTotals } = useTableData<GameTotalsRow>("v_game_totals");
+  const { data: gamePlayers } = useTableData<GamePlayerRow>("game_players");
+  const { data: gameScores } = useTableData<GameScoreRow>("game_scores");
+  const { data: voteItems } = useTableData<VoteItemRow>("vote_items");
+  const { data: voteResponses } = useTableData<VoteResponseRow>("vote_responses");
+  const { data: voteTally } = useTableData<VoteTallyRow>("v_vote_tally");
+  const { data: spins } = useTableData<SpinRow>("spins");
+  const { data: photos } = useTableData<CameraPhotoRow>("camera_photos");
+  const { data: itineraryEvents } = useTableData<ItineraryEventRow>("itinerary_events");
+  const { data: itineraryReactions } = useTableData<ItineraryReactionRow>("itinerary_reactions");
+  const { data: appOpens } = useTableData<AppOpenRow>("app_opens");
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (loading) return;
-  }, [loading]);
 
   const todayKey = useMemo(() => partyDayKey(Date.now()), []);
   const selectedDay = searchParams.get("day") ?? todayKey;
