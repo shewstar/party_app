@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { UserProvider } from "@/lib/user-context";
+import { AchievementsProvider } from "@/lib/achievements-tracker";
+import AchievementToast from "@/components/AchievementToast";
 
 export const metadata: Metadata = {
   title: "Bucks Party",
@@ -19,7 +21,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="font-sans">
         <UserProvider>
-          <div className="mx-auto max-w-md min-h-dvh flex flex-col">{children}</div>
+          <AchievementsProvider>
+            <div className="mx-auto max-w-md min-h-dvh flex flex-col">{children}</div>
+            <AchievementToast />
+          </AchievementsProvider>
         </UserProvider>
       </body>
     </html>
