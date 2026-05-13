@@ -30,6 +30,17 @@ export type VoteItemRow = {
   proposer_id: string | null;
   text: string;
   created_at: string;
+  passed_at: string | null;
+};
+
+export type PushSubscriptionRow = {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent: string | null;
+  created_at: string;
 };
 
 export type VoteResponseRow = {

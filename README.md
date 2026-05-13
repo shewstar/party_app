@@ -56,6 +56,23 @@ drive/no-drive or safety decisions.
 - [lib/](lib) — Supabase clients, BAC + drink math, session
 - [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql) — schema + RLS + realtime
 
+## Push notifications
+
+Triggers: new vote proposal, vote passes majority, itinerary event added, buck hasn't drunk in over an hour. Delivered to everyone except the actor.
+
+1. Run all migrations (including [supabase/migrations/0009_push_subscriptions.sql](supabase/migrations/0009_push_subscriptions.sql)).
+2. Generate VAPID keys and paste them into `.env.local`:
+   ```sh
+   npm run generate-vapid
+   ```
+   Also set `SUPABASE_SERVICE_ROLE_KEY` (Supabase Project Settings → API), `VAPID_SUBJECT=mailto:you@example.com`, and pick long random strings for `SUPABASE_WEBHOOK_SECRET` and `CRON_SECRET`.
+3. In Supabase, **Project Settings → Database → Webhooks** (or the Database Webhooks UI), create three webhooks. For each, add a custom header `x-webhook-secret: <SUPABASE_WEBHOOK_SECRET>`:
+   - `vote_items` · INSERT → `https://YOUR-APP/api/push/events/vote-created`
+   - `vote_responses` · INSERT and UPDATE → `https://YOUR-APP/api/push/events/vote-passed`
+   - `itinerary_events` · INSERT → `https://YOUR-APP/api/push/events/itinerary-added`
+4. Deploy. The `vercel.json` cron entry hits `/api/cron/buck-dry-check` hourly. Vercel signs cron requests with the project's `CRON_SECRET`, so set it in Vercel env vars too.
+5. iOS users must Add to Home Screen before push works — the banner detects iOS Safari and shows the install hint automatically.
+
 ## Notes
 
 - Permissive RLS — this is a private bucks night, not a public service. Anyone with the URL + a connection can write. Don't deploy it publicly.
