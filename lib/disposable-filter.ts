@@ -1,6 +1,6 @@
 import type { FilterVariant } from "./supabase/types";
 
-const SIZE = 1600;
+const SIZE = 800;
 
 export function pickFilterVariant(): FilterVariant {
   return Math.random() < 0.5 ? "warm" : "cool";
@@ -113,7 +113,7 @@ export async function applyDisposableFilter(
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
       "image/jpeg",
-      0.82,
+      0.70,
     );
   });
 }
