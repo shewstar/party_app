@@ -17,7 +17,7 @@ export default function OfflineBanner() {
       onClick={() => setDismissed(true)}
       className="fixed top-0 inset-x-0 z-50 bg-amber-500 text-black text-center text-sm font-medium py-1.5"
     >
-      Offline — changes queued (tap to dismiss)
+      Offline — drinks, scores, spins &amp; itinerary will sync (tap to dismiss)
     </button>
   );
 }

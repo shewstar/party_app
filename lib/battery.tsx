@@ -37,6 +37,9 @@ export function BatteryProvider({ children }: { children: ReactNode }) {
   const [supported, setSupported] = useState(false);
 
   useEffect(() => {
+    // Battery Status API: Chromium-only. Safari (iOS/macOS) and Firefox don't
+    // expose getBattery, so on those engines `supported` stays false and
+    // throttling never engages — by design, not a bug.
     if (typeof navigator === "undefined" || !("getBattery" in navigator)) return;
     let cancelled = false;
 

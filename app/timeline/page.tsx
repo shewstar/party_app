@@ -10,6 +10,7 @@ import { SkeletonCard } from "@/components/Skeleton";
 import type {
   DrinkRow,
   GameRow,
+  GameScoreRow,
   GameTotalsRow,
   ItineraryEventRow,
   SpinRow,
@@ -40,6 +41,7 @@ export default function TimelinePage() {
   const { data: allVotes } = useTableData<VoteTallyRow>("v_vote_tally");
   const { data: allGames } = useTableData<GameRow>("games");
   const { data: allGameTotals } = useTableData<GameTotalsRow>("v_game_totals");
+  const { data: allGameScores } = useTableData<GameScoreRow>("game_scores");
   const { data: allSpins } = useTableData<SpinRow>("spins");
   const { data: allItinerary } = useTableData<ItineraryEventRow>("itinerary_events");
 
@@ -89,6 +91,14 @@ export default function TimelinePage() {
     }
     const gameById = new Map<string, GameRow>();
     for (const g of (allGames ?? []) as GameRow[]) gameById.set(g.id, g);
+    // Latest score per game = effective "finished at" (long games may have
+    // started hours before the win, so created_at would mis-position them).
+    const lastScoreAtByGame = new Map<string, number>();
+    for (const sc of (allGameScores ?? []) as GameScoreRow[]) {
+      const t = new Date(sc.recorded_at).getTime();
+      const prev = lastScoreAtByGame.get(sc.game_id) ?? 0;
+      if (t > prev) lastScoreAtByGame.set(sc.game_id, t);
+    }
 
     for (const [gameId, rows] of totalsByGame) {
       const game = gameById.get(gameId);
@@ -100,7 +110,7 @@ export default function TimelinePage() {
           key: `game-won-${gameId}`,
           icon: "\uD83C\uDFC6",
           text: `${u?.name ?? "Someone"} won ${game.name}`,
-          ts: new Date(game.created_at).getTime(),
+          ts: lastScoreAtByGame.get(gameId) ?? new Date(game.created_at).getTime(),
           userId: winner.user_id,
         });
       }
@@ -133,7 +143,7 @@ export default function TimelinePage() {
 
     list.sort((a, b) => b.ts - a.ts);
     return list;
-  }, [allDrinks, allVotes, allGames, allGameTotals, allSpins, allItinerary, userById]);
+  }, [allDrinks, allVotes, allGames, allGameTotals, allGameScores, allSpins, allItinerary, userById]);
 
   if (loading || !user || !ready) {
     return (
@@ -159,9 +169,7 @@ export default function TimelinePage() {
         )}
         {events.map((ev, i) => {
           const showHeader =
-            i === 0 ||
-            new Date(events[i - 1].ts).getHours() !==
-              new Date(ev.ts).getHours();
+            i === 0 || !sameHourBucket(events[i - 1].ts, ev.ts);
           const u = ev.userId ? userById.get(ev.userId) : null;
           return (
             <div key={ev.key}>
@@ -194,6 +202,17 @@ export default function TimelinePage() {
         })}
       </div>
     </main>
+  );
+}
+
+function sameHourBucket(a: number, b: number): boolean {
+  const da = new Date(a);
+  const db = new Date(b);
+  return (
+    da.getFullYear() === db.getFullYear() &&
+    da.getMonth() === db.getMonth() &&
+    da.getDate() === db.getDate() &&
+    da.getHours() === db.getHours()
   );
 }
 

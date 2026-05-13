@@ -9,6 +9,7 @@ import Avatar from "@/components/Avatar";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
 import { useHaptic } from "@/lib/haptics";
+import { useOnlineStatus } from "@/lib/offline-queue";
 import { SkeletonCard } from "@/components/Skeleton";
 import { useTableData } from "@/lib/realtime-provider";
 import type { UserRow } from "@/lib/supabase/types";
@@ -52,6 +53,7 @@ function initialsOf(name: string) {
 export default function SpinPage() {
   const { user, loading } = useUser();
   const haptic = useHaptic();
+  const { online, enqueue } = useOnlineStatus();
   const { data: members } = useTableData<UserRow>("users");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [rotation, setRotation] = useState(0);
@@ -110,11 +112,16 @@ export default function SpinPage() {
       setSpinning(false);
       setWinner(winnerUser);
       haptic.success();
-      await supabase().from("spins").insert({
+      const payload = {
         spinner_id: user?.id ?? null,
         winner_id: winnerUser.id,
         pool: pool.map((p) => p.id),
-      });
+      };
+      if (!online) {
+        enqueue("spins", payload);
+        return;
+      }
+      await supabase().from("spins").insert(payload);
     }, SPIN_MS + 50);
   }
 

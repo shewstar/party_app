@@ -113,7 +113,7 @@ export async function applyDisposableFilter(
     canvas.toBlob(
       (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
       "image/jpeg",
-      0.70,
+      0.78,
     );
   });
 }

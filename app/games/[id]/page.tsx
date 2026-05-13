@@ -10,6 +10,7 @@ import Chip from "@/components/Chip";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
 import { useHaptic } from "@/lib/haptics";
+import { useOnlineStatus } from "@/lib/offline-queue";
 import { useTableData } from "@/lib/realtime-provider";
 import type { GameRow, GameTotalsRow, UserRow } from "@/lib/supabase/types";
 
@@ -17,6 +18,7 @@ export default function GameDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { user, loading } = useUser();
   const haptic = useHaptic();
+  const { online, enqueue } = useOnlineStatus();
   const { data: allGames } = useTableData<GameRow>("games");
   const { data: allTotalsRaw } = useTableData<GameTotalsRow>("v_game_totals");
   const { data: allUsers } = useTableData<UserRow>("users");
@@ -57,11 +59,12 @@ export default function GameDetailPage() {
           : r,
       ),
     );
-    await supabase().from("game_scores").insert({
-      game_id: game.id,
-      user_id: userId,
-      score: delta,
-    });
+    const payload = { game_id: game.id, user_id: userId, score: delta };
+    if (!online) {
+      enqueue("game_scores", payload);
+    } else {
+      await supabase().from("game_scores").insert(payload);
+    }
     setBusy(null);
   }
 

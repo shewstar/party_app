@@ -7,6 +7,7 @@ import BigButton from "@/components/BigButton";
 import Avatar from "@/components/Avatar";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
+import { useOnlineStatus } from "@/lib/offline-queue";
 import { SkeletonCard } from "@/components/Skeleton";
 import { useTableData } from "@/lib/realtime-provider";
 import type { ItineraryEventRow, ItineraryReactionRow, UserRow } from "@/lib/supabase/types";
@@ -32,6 +33,7 @@ function toLocalInput(iso: string): string {
 
 export default function ItineraryPage() {
   const { user, loading } = useUser();
+  const { online, enqueue } = useOnlineStatus();
   const { data: events } = useTableData<ItineraryEventRow>("itinerary_events");
   const { data: users } = useTableData<UserRow>("users");
   const [reactions, setReactions] = useState<ItineraryReactionRow[]>([]);
@@ -132,7 +134,12 @@ export default function ItineraryPage() {
     if (editingId) {
       await s.from("itinerary_events").update(payload).eq("id", editingId);
     } else {
-      await s.from("itinerary_events").insert({ ...payload, created_by: user.id });
+      const insertPayload = { ...payload, created_by: user.id };
+      if (!online) {
+        enqueue("itinerary_events", insertPayload);
+      } else {
+        await s.from("itinerary_events").insert(insertPayload);
+      }
     }
 
     resetForm();

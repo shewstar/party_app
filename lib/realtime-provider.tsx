@@ -84,7 +84,6 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const listenersRef = useRef<Map<TableName, Set<Listener>>>(new Map());
   const channelRef = useRef<ReturnType<ReturnType<typeof supabase>["channel"]> | null>(null);
   const [ready, setReady] = useState(false);
-  const [tick, setTick] = useState(0);
   const { throttleMs } = useBattery();
   const pendingRef = useRef<Set<TableName>>(new Set());
   const throttleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -165,7 +164,9 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     try {
       const data = await fetchTable(table);
       cacheRef.current.set(table, data);
-      setTick((n) => n + 1);
+      // Notify only subscribers of this table — context value stays stable so
+      // unrelated consumers don't re-render on every realtime event.
+      listenersRef.current.get(table)?.forEach((fn) => fn());
     } catch {
       // network error — keep stale cache
     }
@@ -179,7 +180,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     <T,>(table: TableName): T[] => {
       return (cacheRef.current.get(table) ?? []) as T[];
     },
-    [tick], // eslint-disable-line react-hooks/exhaustive-deps
+    [],
   );
 
   const subscribe = useCallback(

@@ -17,6 +17,7 @@ import { estimateBAC } from "@/lib/bac";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
 import { useHaptic } from "@/lib/haptics";
+import { useOnlineStatus } from "@/lib/offline-queue";
 import { SkeletonCard } from "@/components/Skeleton";
 import type { DrinkCategory, DrinkRow } from "@/lib/supabase/types";
 
@@ -24,6 +25,7 @@ export default function AddDrinkPage() {
   const router = useRouter();
   const { user, loading } = useUser();
   const haptic = useHaptic();
+  const { online, enqueue } = useOnlineStatus();
   const [category, setCategory] = useState<DrinkCategory | null>(null);
   const [presetId, setPresetId] = useState<string | null>(null);
   const [customVol, setCustomVol] = useState("");
@@ -100,6 +102,25 @@ export default function AddDrinkPage() {
     }
     setSubmitting(true);
     const sd = standardDrinks(volume_ml, abv);
+
+    if (!online) {
+      // Offline: skip the BAC-based new-session check (it requires reading from
+      // the server) and queue with the server's default logged_at.
+      enqueue("drink_entries", {
+        user_id: user.id,
+        category,
+        label,
+        volume_ml,
+        abv,
+        standard_drinks: sd,
+        ...(isCustom && saveForNext ? { is_saved_preset: true } : {}),
+      });
+      setSubmitting(false);
+      haptic.success();
+      router.push("/");
+      return;
+    }
+
     const s = supabase();
 
     let startNewSession = !user.first_drink_at;

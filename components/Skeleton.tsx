@@ -35,7 +35,7 @@ export function SkeletonCard({ rows = 1, className }: { rows?: number; className
 
 export function SkeletonTile() {
   return (
-    <div className="rounded-card border border-line bg-surface px-4 py-5 flex flex-col gap-2 animate-pulse">
+    <div className="rounded-card border border-line bg-surface px-4 py-5 flex flex-col gap-2">
       <div className={clsx(pulse(), "w-8 h-8")} />
       <div className="flex flex-col gap-1.5">
         <SkeletonLine width="w-3/4" />
