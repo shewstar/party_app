@@ -343,6 +343,20 @@ function RecapPageInner() {
     };
   }, [users, windowedDrinks, windowedVoteItems, windowedVoteTally, windowedGameTotals]);
 
+  const buckStats = useMemo(() => {
+    const buck = users.find((u) => u.is_buck);
+    if (!buck) return null;
+    const buckDrinks = windowedDrinks.filter((d) => d.user_id === buck.id);
+    const totalStd = buckDrinks.reduce((s, d) => s + Number(d.standard_drinks), 0);
+    const sessionStart =
+      buckDrinks.length > 0
+        ? Math.min(...buckDrinks.map((d) => new Date(d.logged_at).getTime()))
+        : undefined;
+    const peak = peakBAC(buck, buckDrinks, sessionStart);
+    const wins = gameWinsByUser(windowedGameTotals).find((r) => r.user_id === buck.id);
+    return { buck, count: buckDrinks.length, std: totalStd, peak, winCount: wins?.wins ?? 0 };
+  }, [users, windowedDrinks, windowedGameTotals]);
+
   function buildShareText(): string {
     if (!user || !personal) return "";
     const dayLabel = formatPartyDay(selectedDay, todayKey);
@@ -442,7 +456,7 @@ function RecapPageInner() {
       <div className="px-5 pb-4 flex flex-col gap-4 flex-1">
         <Card>
           <div className="flex items-center gap-3 mb-4">
-            <Avatar name={user.name} url={user.avatar_url} size={40} />
+            <Avatar name={user.name} url={user.avatar_url} size={40} isBuck={user.is_buck} />
             <div>
               <div className="text-xs uppercase tracking-wide text-muted">
                 {formatPartyDay(selectedDay, todayKey)}
@@ -476,6 +490,30 @@ function RecapPageInner() {
             </ul>
           )}
         </Card>
+
+        {buckStats && (
+          <Card>
+            <h2 className="font-semibold mb-1">👑 Buck's Night</h2>
+            <p className="text-xs text-muted mb-3">{buckStats.buck.name}</p>
+            <ul className="flex flex-col gap-3">
+              <StatRow label="Drinks" value={`${buckStats.count}`} sub={`${buckStats.std.toFixed(1)} std`} />
+              <StatRow
+                label="Peak BAC"
+                value={
+                  buckStats.peak.status === "ok" && buckStats.peak.value > 0
+                    ? buckStats.peak.value.toFixed(3)
+                    : formatBAC(buckStats.peak)
+                }
+                sub={
+                  buckStats.peak.status === "ok" && buckStats.peak.atMs
+                    ? `at ${formatClockTime(buckStats.peak.atMs)}`
+                    : undefined
+                }
+              />
+              <StatRow label="Game wins" value={`${buckStats.winCount}`} />
+            </ul>
+          </Card>
+        )}
 
         <Card>
           <h2 className="font-semibold mb-1">Your achievements</h2>
@@ -580,7 +618,7 @@ function RecapPageInner() {
                   </div>
                   <div className="flex -space-x-2">
                     {us.slice(0, 4).map((u) => (
-                      <Avatar key={u.id} name={u.name} url={u.avatar_url} size={24} />
+                      <Avatar key={u.id} name={u.name} url={u.avatar_url} size={24} isBuck={u.is_buck} />
                     ))}
                     {us.length > 4 && (
                       <span className="text-xs text-muted ml-1 self-center">
@@ -632,6 +670,7 @@ function RecapPageInner() {
                           name={photographer.name}
                           url={photographer.avatar_url}
                           size={20}
+                          isBuck={photographer.is_buck}
                         />
                         <span className="text-xs truncate">{photographer.name}</span>
                       </div>
@@ -701,7 +740,7 @@ function SuperRow({
       <div className="flex-1 min-w-0">
         <div className="text-sm text-muted">{label}</div>
         <div className="flex items-center gap-2 min-w-0">
-          {user && <Avatar name={user.name} url={user.avatar_url} size={24} />}
+          {user && <Avatar name={user.name} url={user.avatar_url} size={24} isBuck={user.is_buck} />}
           <span className="font-medium truncate">{user?.name ?? "—"}</span>
         </div>
       </div>

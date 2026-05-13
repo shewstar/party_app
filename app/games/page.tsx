@@ -171,7 +171,9 @@ export default function GamesPage() {
                       <div className="text-sm mt-1">
                         <span className="text-xs text-accent font-medium">✓ Finished</span>
                         <span className="text-muted"> — Winner: </span>
-                        <span className="text-ink font-medium">{top.user_name}</span>
+                        <span className="text-ink font-medium">
+                          {top.is_buck && "👑 "}{top.user_name}
+                        </span>
                         <span className="text-muted"> · {Number(top.total_score)}</span>
                       </div>
                     ) : (
@@ -179,7 +181,7 @@ export default function GamesPage() {
                     )
                   ) : top ? (
                     <div className="text-sm text-muted mt-1">
-                      Leading: <span className="text-ink font-medium">{top.user_name}</span> · {Number(top.total_score)}
+                      Leading: <span className="text-ink font-medium">{top.is_buck ? "👑 " : ""}{top.user_name}</span> · {Number(top.total_score)}
                     </div>
                   ) : null}
                 </Link>

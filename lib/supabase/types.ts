@@ -9,6 +9,7 @@ export type UserRow = {
   first_drink_at: string | null;
   avatar_url: string | null;
   is_itinerary_editor: boolean;
+  is_buck: boolean;
   created_at: string;
 };
 
@@ -62,6 +63,7 @@ export type DrinksLeaderboardRow = {
   id: string;
   name: string;
   avatar_url: string | null;
+  is_buck: boolean;
   drink_count: number;
   standard_drinks: number;
 };
@@ -82,6 +84,7 @@ export type GameTotalsRow = {
   user_id: string;
   user_name: string;
   avatar_url: string | null;
+  is_buck: boolean;
   total_score: number;
 };
 

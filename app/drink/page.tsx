@@ -25,12 +25,14 @@ export default function AddDrinkPage() {
   const [presetId, setPresetId] = useState<string | null>(null);
   const [customVol, setCustomVol] = useState("");
   const [customAbv, setCustomAbv] = useState("");
+  const [customName, setCustomName] = useState("");
   const [saveForNext, setSaveForNext] = useState(false);
   const [savedPresets, setSavedPresets] = useState<Preset[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (presetId !== "custom") setSaveForNext(false);
+    setCustomName("");
   }, [presetId]);
 
   useEffect(() => {
@@ -69,7 +71,7 @@ export default function AddDrinkPage() {
       volume_ml = Number(customVol);
       const abvPct = Number(customAbv);
       abv = abvPct / 100;
-      label = `Custom — ${volume_ml}ml @ ${customAbv}%`;
+      label = customName.trim() || `Custom — ${volume_ml}ml @ ${customAbv}%`;
       if (
         isNaN(volume_ml) ||
         isNaN(abvPct) ||
@@ -160,18 +162,33 @@ export default function AddDrinkPage() {
       <TopBar title={`Add ${category}`} />
       <div className="px-5 py-4 flex flex-col gap-5">
         <Card>
-          <div className="text-sm text-muted mb-2">Pick a size</div>
-          <div className="flex flex-wrap gap-2">
-            {presets.map((p) => (
-              <Chip key={p.id} active={presetId === p.id} onClick={() => setPresetId(p.id)}>
-                {p.label}
-              </Chip>
-            ))}
-            {savedPresets.map((p) => (
-              <Chip key={p.id} active={presetId === p.id} onClick={() => setPresetId(p.id)}>
-                {p.label}
-              </Chip>
-            ))}
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-muted">Pick a size</span>
+            <select
+              value={presetId && presetId !== "custom" && !presetId.startsWith("saved:") ? presetId : ""}
+              onChange={(e) => setPresetId(e.target.value || null)}
+              className="border border-line rounded-card px-3 py-2 bg-surface text-ink"
+            >
+              <option value="" disabled>
+                Pick a size
+              </option>
+              {presets.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {savedPresets.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {savedPresets.map((p) => (
+                <Chip key={p.id} active={presetId === p.id} onClick={() => setPresetId(p.id)}>
+                  {p.label}
+                </Chip>
+              ))}
+            </div>
+          )}
+          <div className="mt-3">
             <Chip active={presetId === "custom"} onClick={() => setPresetId("custom")}>
               Custom…
             </Chip>
@@ -206,6 +223,17 @@ export default function AddDrinkPage() {
                   />
                 </label>
               </div>
+              <label className="flex flex-col gap-1 mt-3">
+                <span className="text-xs text-muted">Name (optional)</span>
+                <input
+                  type="text"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  placeholder="e.g. Jagerbomb"
+                  className="w-full border border-line rounded-card px-3 py-2 bg-surface"
+                  maxLength={60}
+                />
+              </label>
               <label className="flex items-center gap-2 mt-3 text-sm">
                 <input
                   type="checkbox"

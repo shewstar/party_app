@@ -373,7 +373,7 @@ export default function SpinPage() {
               <div className="text-xs uppercase tracking-wide text-muted">
                 Winner
               </div>
-              <Avatar name={winner.name} url={winner.avatar_url} size={72} />
+              <Avatar name={winner.name} url={winner.avatar_url} size={72} isBuck={winner.is_buck} />
               <div className="text-2xl font-bold">{winner.name}</div>
               <button
                 type="button"

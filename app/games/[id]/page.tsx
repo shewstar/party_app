@@ -210,10 +210,10 @@ export default function GameDetailPage() {
           </Card>
         )}
         {sorted.map((row, i) => (
-          <Card key={row.user_id}>
+          <Card key={row.user_id} className={row.is_buck ? "ring-2 ring-amber-400" : ""}>
             <div className="flex items-center gap-3">
               <span className="w-5 text-muted text-sm tabular-nums">{i + 1}</span>
-              <Avatar name={row.user_name} url={row.avatar_url} size={36} />
+              <Avatar name={row.user_name} url={row.avatar_url} size={36} isBuck={row.is_buck} />
               <div className="flex-1">
                 <div className="font-medium">{row.user_name}</div>
                 <div className="text-xs text-muted tabular-nums">

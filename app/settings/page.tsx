@@ -7,6 +7,7 @@ import BigButton from "@/components/BigButton";
 import Avatar from "@/components/Avatar";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
+import type { UserRow } from "@/lib/supabase/types";
 
 const HIDDEN_TAPS = 5;
 
@@ -31,12 +32,19 @@ export default function SettingsPage() {
   const [showEditor, setShowEditor] = useState(false);
   const [togglingEditor, setTogglingEditor] = useState(false);
 
+  // Crew
+  const [crew, setCrew] = useState<UserRow[]>([]);
+
   useEffect(() => {
     if (!user) return;
     setName(user.name ?? "");
     setWeight(user.weight_kg?.toString() ?? "");
     setFirstDrink(toLocalInput(user.first_drink_at));
   }, [user]);
+
+  useEffect(() => {
+    if (showEditor) loadCrew();
+  }, [showEditor]);
 
   if (loading || !user) {
     return <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>;
@@ -108,6 +116,22 @@ export default function SettingsPage() {
     const { error } = await supabase().from("drink_entries").delete().eq("user_id", user.id);
     if (error) setMsg(error.message);
     else setMsg("Drink history cleared.");
+  }
+
+  async function loadCrew() {
+    const { data } = await supabase().from("users").select("*").order("name");
+    setCrew((data ?? []) as UserRow[]);
+  }
+
+  async function makeBuck(targetId: string) {
+    if (!user) return;
+    setMsg(null);
+    const s = supabase();
+    await s.from("users").update({ is_buck: false }).neq("id", "00000000-0000-0000-0000-000000000000");
+    const { error } = await s.from("users").update({ is_buck: true }).eq("id", targetId);
+    if (error) { setMsg(error.message); return; }
+    await loadCrew();
+    if (targetId === user.id) await refresh();
   }
 
   async function toggleEditor() {
@@ -219,27 +243,54 @@ export default function SettingsPage() {
         </div>
 
         {showEditor && (
-          <Card>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-semibold text-sm">Itinerary Editor</div>
-                <div className="text-xs text-muted">Add & edit events on the itinerary</div>
-              </div>
-              <button
-                onClick={toggleEditor}
-                disabled={togglingEditor}
-                className={`relative w-11 h-6 rounded-full transition ${
-                  user.is_itinerary_editor ? "bg-accent" : "bg-muted"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition ${
-                    user.is_itinerary_editor ? "left-5" : "left-0.5"
+          <>
+            <Card>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-semibold text-sm">Itinerary Editor</div>
+                  <div className="text-xs text-muted">Add & edit events on the itinerary</div>
+                </div>
+                <button
+                  onClick={toggleEditor}
+                  disabled={togglingEditor}
+                  className={`relative w-11 h-6 rounded-full transition ${
+                    user.is_itinerary_editor ? "bg-accent" : "bg-muted"
                   }`}
-                />
-              </button>
-            </div>
-          </Card>
+                >
+                  <span
+                    className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition ${
+                      user.is_itinerary_editor ? "left-5" : "left-0.5"
+                    }`}
+                  />
+                </button>
+              </div>
+            </Card>
+
+            <Card>
+              <h2 className="font-semibold mb-3">Crew</h2>
+              {crew.length === 0 && (
+                <p className="text-sm text-muted">No one else here yet.</p>
+              )}
+              <ul className="flex flex-col gap-2">
+                {crew.map(member => (
+                  <li key={member.id} className="flex items-center gap-3">
+                    <Avatar name={member.name} url={member.avatar_url} size={36} isBuck={member.is_buck} />
+                    <span className="flex-1 font-medium text-sm truncate">{member.name}</span>
+                    {member.is_buck ? (
+                      <span className="text-sm shrink-0">👑 Buck</span>
+                    ) : (
+                      <button
+                        onClick={() => makeBuck(member.id)}
+                        className="text-xs text-accent underline shrink-0"
+                      >
+                        Make Buck
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </>
         )}
       </div>
     </main>

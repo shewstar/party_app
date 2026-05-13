@@ -17,7 +17,7 @@ import type {
   UserRow,
 } from "@/lib/supabase/types";
 
-type Tab = "drinks" | "bac" | "games" | "overall";
+type Tab = "drinks" | "bac" | "games" | "overall" | "std";
 
 export default function LeaderboardsPage() {
   const { user, loading } = useUser();
@@ -73,9 +73,9 @@ export default function LeaderboardsPage() {
   }, [users, drinks]);
 
   const gameRows = useMemo(() => {
-    const byUser = new Map<string, { user_id: string; name: string; avatar_url: string | null; total: number; wins: number }>();
+    const byUser = new Map<string, { user_id: string; name: string; avatar_url: string | null; is_buck: boolean; total: number; wins: number }>();
     for (const u of users) {
-      byUser.set(u.id, { user_id: u.id, name: u.name, avatar_url: u.avatar_url, total: 0, wins: 0 });
+      byUser.set(u.id, { user_id: u.id, name: u.name, avatar_url: u.avatar_url, is_buck: u.is_buck, total: 0, wins: 0 });
     }
     for (const t of gameTotals) {
       const row = byUser.get(t.user_id);
@@ -123,7 +123,7 @@ export default function LeaderboardsPage() {
     <main className="flex-1 flex flex-col">
       <TopBar title="Leaderboards" />
       <div className="px-5 py-2 flex gap-2 overflow-x-auto">
-        {(["drinks", "bac", "games", "overall"] as Tab[]).map((t) => (
+        {(["drinks", "std", "bac", "games", "overall"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -140,15 +140,15 @@ export default function LeaderboardsPage() {
       </div>
       <div className="px-5 pb-4 flex flex-col gap-3 flex-1">
         <Card>
-          {tab === "drinks" && (
+          {      tab === "drinks" && (
             <ul className="flex flex-col gap-3">
               {drinkBoard
                 .slice()
                 .sort((a, b) => b.drink_count - a.drink_count)
                 .map((r, i) => (
-                  <li key={r.id} className="flex items-center gap-3">
+                  <li key={r.id} className={`flex items-center gap-3 rounded-lg ${r.is_buck ? "bg-amber-50/50 -mx-2 px-2 py-1" : ""}`}>
                     <span className="w-5 text-muted text-sm tabular-nums">{i + 1}</span>
-                    <Avatar name={r.name} url={r.avatar_url} size={32} />
+                    <Avatar name={r.name} url={r.avatar_url} size={32} isBuck={r.is_buck} />
                     <span className="flex-1 font-medium">{r.name}</span>
                     <span className="tabular-nums font-semibold">{r.drink_count}</span>
                     <span className="text-xs text-muted tabular-nums">
@@ -162,12 +162,36 @@ export default function LeaderboardsPage() {
             </ul>
           )}
 
+          {tab === "std" && (
+            <ul className="flex flex-col gap-3">
+              {drinkBoard
+                .slice()
+                .sort((a, b) => Number(b.standard_drinks) - Number(a.standard_drinks))
+                .map((r, i) => (
+                  <li key={r.id} className={`flex items-center gap-3 rounded-lg ${r.is_buck ? "bg-amber-50/50 -mx-2 px-2 py-1" : ""}`}>
+                    <span className="w-5 text-muted text-sm tabular-nums">{i + 1}</span>
+                    <Avatar name={r.name} url={r.avatar_url} size={32} isBuck={r.is_buck} />
+                    <span className="flex-1 font-medium">{r.name}</span>
+                    <span className="tabular-nums font-semibold">
+                      {Number(r.standard_drinks).toFixed(1)}
+                    </span>
+                    <span className="text-xs text-muted tabular-nums">
+                      {r.drink_count} drinks
+                    </span>
+                  </li>
+                ))}
+              {drinkBoard.length === 0 && (
+                <li className="text-sm text-muted text-center">No data.</li>
+              )}
+            </ul>
+          )}
+
           {tab === "bac" && (
             <ul className="flex flex-col gap-3">
               {bacRows.map((row, i) => (
-                <li key={row.user.id} className="flex items-center gap-3">
+                <li key={row.user.id} className={`flex items-center gap-3 rounded-lg ${row.user.is_buck ? "bg-amber-50/50 -mx-2 px-2 py-1" : ""}`}>
                   <span className="w-5 text-muted text-sm tabular-nums">{i + 1}</span>
-                  <Avatar name={row.user.name} url={row.user.avatar_url} size={32} />
+                  <Avatar name={row.user.name} url={row.user.avatar_url} size={32} isBuck={row.user.is_buck} />
                   <span className="flex-1 font-medium">{row.user.name}</span>
                   <BACBadge result={row.bac} />
                 </li>
@@ -181,9 +205,9 @@ export default function LeaderboardsPage() {
           {tab === "games" && (
             <ul className="flex flex-col gap-3">
               {gameRows.map((r, i) => (
-                <li key={r.user_id} className="flex items-center gap-3">
+                <li key={r.user_id} className={`flex items-center gap-3 rounded-lg ${r.is_buck ? "bg-amber-50/50 -mx-2 px-2 py-1" : ""}`}>
                   <span className="w-5 text-muted text-sm tabular-nums">{i + 1}</span>
-                  <Avatar name={r.name} url={r.avatar_url} size={32} />
+                  <Avatar name={r.name} url={r.avatar_url} size={32} isBuck={r.is_buck} />
                   <span className="flex-1 font-medium">{r.name}</span>
                   <span className="tabular-nums font-semibold">{r.wins} W</span>
                   <span className="text-xs text-muted tabular-nums">{r.total} pts</span>
@@ -198,9 +222,9 @@ export default function LeaderboardsPage() {
           {tab === "overall" && (
             <ul className="flex flex-col gap-3">
               {overallRows.map((r, i) => (
-                <li key={r.user.id} className="flex items-center gap-3">
+                <li key={r.user.id} className={`flex items-center gap-3 rounded-lg ${r.user.is_buck ? "bg-amber-50/50 -mx-2 px-2 py-1" : ""}`}>
                   <span className="w-5 text-muted text-sm tabular-nums">{i + 1}</span>
-                  <Avatar name={r.user.name} url={r.user.avatar_url} size={32} />
+                  <Avatar name={r.user.name} url={r.user.avatar_url} size={32} isBuck={r.user.is_buck} />
                   <span className="flex-1 font-medium">{r.user.name}</span>
                   <span className="text-xs text-muted">drinks + game wins</span>
                 </li>

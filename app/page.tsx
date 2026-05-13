@@ -13,9 +13,20 @@ import { estimateBAC } from "@/lib/bac";
 import { useUser } from "@/lib/user-context";
 import { useAchievements } from "@/lib/achievements-tracker";
 import { partyDayKey } from "@/lib/recap";
-import type { DrinkRow, DrinksLeaderboardRow, VoteTallyRow } from "@/lib/supabase/types";
+import type { DrinkRow, DrinksLeaderboardRow, UserRow, VoteTallyRow } from "@/lib/supabase/types";
 
 const CAMERA_DAILY_LIMIT = 3;
+
+function timeSince(iso: string | null): string {
+  if (!iso) return "";
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
 
 export default function HomePage() {
   const { user, loading } = useUser();
@@ -25,6 +36,8 @@ export default function HomePage() {
   const [forItems, setForItems] = useState<VoteTallyRow[]>([]);
   const [newVoteCount, setNewVoteCount] = useState(0);
   const [cameraUsed, setCameraUsed] = useState(0);
+  const [buckUser, setBuckUser] = useState<UserRow | null>(null);
+  const [buckDrinks, setBuckDrinks] = useState<DrinkRow[]>([]);
 
   async function loadAll(uid?: string) {
     const s = supabase();
@@ -36,6 +49,7 @@ export default function HomePage() {
       { data: voteIds },
       { data: myResponses },
       cameraCount,
+      { data: buck },
     ] = await Promise.all([
       uid
         ? s.from("drink_entries").select("*").eq("user_id", uid).order("logged_at", { ascending: false })
@@ -53,6 +67,7 @@ export default function HomePage() {
             .eq("user_id", uid)
             .eq("party_day", todayKey)
         : Promise.resolve({ count: 0 as number | null }),
+      s.from("users").select("*").eq("is_buck", true).maybeSingle(),
     ]);
     setMyDrinks((drinks ?? []) as DrinkRow[]);
     setBoard((lb ?? []) as DrinksLeaderboardRow[]);
@@ -63,6 +78,15 @@ export default function HomePage() {
     const unvoted = ((voteIds ?? []) as { id: string }[]).filter((v) => !voted.has(v.id)).length;
     setNewVoteCount(unvoted);
     setCameraUsed(cameraCount.count ?? 0);
+
+    const b = (buck ?? null) as UserRow | null;
+    setBuckUser(b);
+    if (b) {
+      const { data: bd } = await s.from("drink_entries").select("*").eq("user_id", b.id).order("logged_at", { ascending: false });
+      setBuckDrinks((bd ?? []) as DrinkRow[]);
+    } else {
+      setBuckDrinks([]);
+    }
   }
 
   useEffect(() => {
@@ -97,6 +121,11 @@ export default function HomePage() {
     [user, myDrinks],
   );
 
+  const buckBac = useMemo(
+    () => (buckUser ? estimateBAC(buckUser, buckDrinks) : null),
+    [buckUser, buckDrinks],
+  );
+
   if (loading || !user) {
     return <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>;
   }
@@ -105,7 +134,7 @@ export default function HomePage() {
     <main className="flex-1 px-5 py-6 flex flex-col gap-6">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Avatar name={user.name} url={user.avatar_url} size={44} />
+          <Avatar name={user.name} url={user.avatar_url} size={44} isBuck={user.is_buck} />
           <div>
             <div className="text-sm text-muted">Hey</div>
             <div className="text-lg font-semibold">{user.name}</div>
@@ -161,6 +190,31 @@ export default function HomePage() {
         ➕ Add a Drink
       </BigButton>
 
+      {buckUser && (
+        <Card>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">👑</span>
+              <h2 className="font-semibold text-sm uppercase tracking-wide text-muted">Buck Watch</h2>
+            </div>
+            <div className="flex items-center gap-3">
+              <Avatar name={buckUser.name} url={buckUser.avatar_url} size={48} isBuck />
+              <div className="flex flex-col gap-0.5">
+                <div className="font-semibold text-lg">{buckUser.name}</div>
+                <div className="text-sm text-muted">
+                  <span className="tabular-nums">{buckDrinks.length}</span> drinks ·
+                  <span className="tabular-nums"> {buckDrinks.reduce((s, d) => s + Number(d.standard_drinks), 0).toFixed(1)}</span> std ·
+                  <span className="tabular-nums"> {buckBac?.status === "ok" ? `${buckBac.value.toFixed(3)}%` : "—"}</span> BAC
+                </div>
+                <div className="text-xs text-muted">
+                  ⏱ Last drink: <span className="tabular-nums">{buckDrinks.length > 0 ? timeSince(buckDrinks[0].logged_at) : "none"}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <Tile href="/games" icon="🎯" label="Games" sub="Score it" />
         <Tile href="/leaderboards" icon="🏆" label="Leaderboards" sub="Who's winning" />
@@ -190,9 +244,9 @@ export default function HomePage() {
         <ul className="flex flex-col gap-3">
           {board.length === 0 && <li className="text-sm text-muted">No drinks yet.</li>}
           {board.map((row, i) => (
-            <li key={row.id} className="flex items-center gap-3">
+            <li key={row.id} className={`flex items-center gap-3 rounded-lg ${row.is_buck ? "bg-amber-50/50 -mx-2 px-2 py-1" : ""}`}>
               <span className="w-5 text-muted text-sm tabular-nums">{i + 1}</span>
-              <Avatar name={row.name} url={row.avatar_url} size={32} />
+              <Avatar name={row.name} url={row.avatar_url} size={32} isBuck={row.is_buck} />
               <span className="flex-1 font-medium">{row.name}</span>
               <span className="tabular-nums font-semibold">{row.drink_count}</span>
             </li>
