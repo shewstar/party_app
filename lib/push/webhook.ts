@@ -17,6 +17,11 @@ export function authorizeWebhook(req: NextRequest): boolean {
   return provided === expected;
 }
 
+export function pushEnabled(): boolean {
+  const flag = process.env.PUSH_ENABLED?.toLowerCase();
+  return flag !== "false" && flag !== "0";
+}
+
 export function authorizeCron(req: NextRequest): boolean {
   const expected = process.env.CRON_SECRET;
   if (!expected) return false;
