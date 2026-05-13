@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import Link from "next/link";
 import TopBar from "@/components/TopBar";
 import Card from "@/components/Card";
@@ -11,6 +11,43 @@ import { useUser } from "@/lib/user-context";
 import type { GameRow, GameTotalsRow, UserRow } from "@/lib/supabase/types";
 
 type GameSummary = GameRow & { totals: GameTotalsRow[] };
+
+const GameCard = memo(function GameCard({ game }: { game: GameSummary }) {
+  const top = [...game.totals].sort((a, b) => b.total_score - a.total_score)[0];
+  return (
+    <li>
+      <Link
+        href={`/games/${game.id}`}
+        className={`block border border-line rounded-card shadow-card p-4 ${
+          game.finished ? "bg-muted/10" : "bg-surface"
+        }`}
+      >
+        <div className="flex justify-between items-baseline">
+          <span className={`font-semibold ${game.finished ? "line-through text-muted" : ""}`}>{game.name}</span>
+          <span className="text-xs text-muted">{game.totals.length} player{game.totals.length === 1 ? "" : "s"}</span>
+        </div>
+        {game.finished ? (
+          top ? (
+            <div className="text-sm mt-1">
+              <span className="text-xs text-accent font-medium">✓ Finished</span>
+              <span className="text-muted"> — Winner: </span>
+              <span className="text-ink font-medium">
+                {top.is_buck && "👑 "}{top.user_name}
+              </span>
+              <span className="text-muted"> · {Number(top.total_score)}</span>
+            </div>
+          ) : (
+            <div className="text-xs text-accent mt-1 font-medium">✓ Finished</div>
+          )
+        ) : top ? (
+          <div className="text-sm text-muted mt-1">
+            Leading: <span className="text-ink font-medium">{top.is_buck ? "👑 " : ""}{top.user_name}</span> · {Number(top.total_score)}
+          </div>
+        ) : null}
+      </Link>
+    </li>
+  );
+});
 
 export default function GamesPage() {
   const { user, loading } = useUser();
@@ -152,42 +189,9 @@ export default function GamesPage() {
               No games yet. Start one.
             </li>
           )}
-          {games.map((g) => {
-            const top = [...g.totals].sort((a, b) => b.total_score - a.total_score)[0];
-            return (
-              <li key={g.id}>
-                <Link
-                  href={`/games/${g.id}`}
-                  className={`block border border-line rounded-card shadow-card p-4 ${
-                    g.finished ? "bg-muted/10" : "bg-surface"
-                  }`}
-                >
-                  <div className="flex justify-between items-baseline">
-                    <span className={`font-semibold ${g.finished ? "line-through text-muted" : ""}`}>{g.name}</span>
-                    <span className="text-xs text-muted">{g.totals.length} player{g.totals.length === 1 ? "" : "s"}</span>
-                  </div>
-                  {g.finished ? (
-                    top ? (
-                      <div className="text-sm mt-1">
-                        <span className="text-xs text-accent font-medium">✓ Finished</span>
-                        <span className="text-muted"> — Winner: </span>
-                        <span className="text-ink font-medium">
-                          {top.is_buck && "👑 "}{top.user_name}
-                        </span>
-                        <span className="text-muted"> · {Number(top.total_score)}</span>
-                      </div>
-                    ) : (
-                      <div className="text-xs text-accent mt-1 font-medium">✓ Finished</div>
-                    )
-                  ) : top ? (
-                    <div className="text-sm text-muted mt-1">
-                      Leading: <span className="text-ink font-medium">{top.is_buck ? "👑 " : ""}{top.user_name}</span> · {Number(top.total_score)}
-                    </div>
-                  ) : null}
-                </Link>
-              </li>
-            );
-          })}
+          {games.map((g) => (
+              <GameCard key={g.id} game={g} />
+            ))}
         </ul>
       </div>
     </main>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TopBar from "@/components/TopBar";
 import Card from "@/components/Card";
 import { supabase } from "@/lib/supabase/browser";
@@ -9,11 +9,65 @@ import { useHaptic } from "@/lib/haptics";
 import type { VoteResponseRow, VoteTallyRow } from "@/lib/supabase/types";
 import clsx from "@/components/clsx";
 
+const VoteCard = memo(function VoteCard({
+  item, myVote, onVote,
+}: {
+  item: VoteTallyRow;
+  myVote: 1 | -1 | undefined;
+  onVote: (item: VoteTallyRow, value: 1 | -1) => void;
+}) {
+  return (
+    <li
+      className="bg-surface border border-line rounded-card shadow-card p-4 flex flex-col gap-3"
+    >
+      <div className="flex justify-between items-start gap-3">
+        <span className="flex-1">{item.text}</span>
+        <span
+          className={clsx(
+            "tabular-nums font-semibold text-sm",
+            item.net > 0 && "text-accent",
+            item.net < 0 && "text-danger",
+            item.net === 0 && "text-muted",
+          )}
+        >
+          {item.net > 0 ? `+${item.net}` : item.net}
+        </span>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={() => onVote(item, 1)}
+          className={clsx(
+            "flex-1 rounded-card border px-3 py-2 font-medium",
+            myVote === 1
+              ? "bg-accent text-white border-accent"
+              : "bg-surface text-ink border-line",
+          )}
+        >
+          👍 For · {item.for_count}
+        </button>
+        <button
+          onClick={() => onVote(item, -1)}
+          className={clsx(
+            "flex-1 rounded-card border px-3 py-2 font-medium",
+            myVote === -1
+              ? "bg-danger text-white border-danger"
+              : "bg-surface text-ink border-line",
+          )}
+        >
+          👎 Against · {item.against_count}
+        </button>
+      </div>
+    </li>
+  );
+});
+
 export default function VotePage() {
   const { user, loading } = useUser();
   const haptic = useHaptic();
   const [items, setItems] = useState<VoteTallyRow[]>([]);
   const [myVotes, setMyVotes] = useState<Record<string, 1 | -1>>({});
+  const myVotesRef = useRef(myVotes);
+  myVotesRef.current = myVotes;
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
 
@@ -70,10 +124,10 @@ export default function VotePage() {
     setPosting(false);
   }
 
-  async function castVote(item: VoteTallyRow, value: 1 | -1) {
+  const castVote = useCallback(async (item: VoteTallyRow, value: 1 | -1) => {
     if (!user) return;
     haptic.medium();
-    const previous = myVotes[item.id];
+    const previous = myVotesRef.current[item.id];
     if (previous === value) {
       // Toggle off — delete the response.
       setMyVotes((m) => {
@@ -98,7 +152,6 @@ export default function VotePage() {
         .delete()
         .eq("vote_item_id", item.id)
         .eq("user_id", user.id);
-      return;
     }
     setMyVotes((m) => ({ ...m, [item.id]: value }));
     setItems((arr) =>
@@ -118,7 +171,8 @@ export default function VotePage() {
         { vote_item_id: item.id, user_id: user.id, value, updated_at: new Date().toISOString() },
         { onConflict: "vote_item_id,user_id" },
       );
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, haptic]);
 
   const filtered = useMemo(() => {
     let list = items;
@@ -196,53 +250,14 @@ export default function VotePage() {
               {filter !== "all" ? "Nothing matches this filter." : "No proposals yet. Be the first."}
             </li>
           )}
-          {filtered.map((v) => {
-            const mine = myVotes[v.id];
-            return (
-              <li
+          {filtered.map((v) => (
+              <VoteCard
                 key={v.id}
-                className="bg-surface border border-line rounded-card shadow-card p-4 flex flex-col gap-3"
-              >
-                <div className="flex justify-between items-start gap-3">
-                  <span className="flex-1">{v.text}</span>
-                  <span
-                    className={clsx(
-                      "tabular-nums font-semibold text-sm",
-                      v.net > 0 && "text-accent",
-                      v.net < 0 && "text-danger",
-                      v.net === 0 && "text-muted",
-                    )}
-                  >
-                    {v.net > 0 ? `+${v.net}` : v.net}
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => castVote(v, 1)}
-                    className={clsx(
-                      "flex-1 rounded-card border px-3 py-2 font-medium",
-                      mine === 1
-                        ? "bg-accent text-white border-accent"
-                        : "bg-surface text-ink border-line",
-                    )}
-                  >
-                    👍 For · {v.for_count}
-                  </button>
-                  <button
-                    onClick={() => castVote(v, -1)}
-                    className={clsx(
-                      "flex-1 rounded-card border px-3 py-2 font-medium",
-                      mine === -1
-                        ? "bg-danger text-white border-danger"
-                        : "bg-surface text-ink border-line",
-                    )}
-                  >
-                    👎 Against · {v.against_count}
-                  </button>
-                </div>
-              </li>
-            );
-          })}
+                item={v}
+                myVote={myVotes[v.id]}
+                onVote={castVote}
+              />
+            ))}
         </ul>
       </div>
     </main>

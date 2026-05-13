@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import BigButton from "@/components/BigButton";
 import Card from "@/components/Card";
@@ -16,6 +16,22 @@ import { partyDayKey } from "@/lib/recap";
 import type { DrinkRow, DrinksLeaderboardRow, UserRow, VoteTallyRow } from "@/lib/supabase/types";
 
 const CAMERA_DAILY_LIMIT = 3;
+
+const DrinkBoardRow = memo(function DrinkBoardRow({
+  rank, name, avatarUrl, isBuck, drinkCount,
+}: {
+  rank: number; name: string; avatarUrl: string | null;
+  isBuck: boolean; drinkCount: number;
+}) {
+  return (
+    <li className={`flex items-center gap-3 rounded-lg ${isBuck ? "bg-amber-50/50 -mx-2 px-2 py-1" : ""}`}>
+      <span className="w-5 text-muted text-sm tabular-nums">{rank}</span>
+      <Avatar name={name} url={avatarUrl} size={32} isBuck={isBuck} />
+      <span className="flex-1 font-medium">{name}</span>
+      <span className="tabular-nums font-semibold">{drinkCount}</span>
+    </li>
+  );
+});
 
 function timeSince(iso: string | null): string {
   if (!iso) return "";
@@ -280,12 +296,14 @@ export default function HomePage() {
         <ul className="flex flex-col gap-3">
           {board.length === 0 && <li className="text-sm text-muted">No drinks yet.</li>}
           {board.map((row, i) => (
-            <li key={row.id} className={`flex items-center gap-3 rounded-lg ${row.is_buck ? "bg-amber-50/50 -mx-2 px-2 py-1" : ""}`}>
-              <span className="w-5 text-muted text-sm tabular-nums">{i + 1}</span>
-              <Avatar name={row.name} url={row.avatar_url} size={32} isBuck={row.is_buck} />
-              <span className="flex-1 font-medium">{row.name}</span>
-              <span className="tabular-nums font-semibold">{row.drink_count}</span>
-            </li>
+            <DrinkBoardRow
+              key={row.id}
+              rank={i + 1}
+              name={row.name}
+              avatarUrl={row.avatar_url}
+              isBuck={row.is_buck}
+              drinkCount={row.drink_count}
+            />
           ))}
         </ul>
       </Card>

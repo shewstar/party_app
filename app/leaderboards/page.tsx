@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import TopBar from "@/components/TopBar";
 import Card from "@/components/Card";
 import Avatar from "@/components/Avatar";
@@ -18,6 +18,42 @@ import type {
 } from "@/lib/supabase/types";
 
 type Tab = "drinks" | "bac" | "games" | "overall" | "std";
+
+const StatRow = memo(function StatRow({
+  rank, name, avatarUrl, isBuck, value, sub,
+}: {
+  rank: number; name: string; avatarUrl: string | null;
+  isBuck: boolean; value: string; sub?: string;
+}) {
+  return (
+    <li className={`flex items-center gap-3 rounded-lg ${isBuck ? "bg-amber-50/50 -mx-2 px-2 py-1" : ""}`}>
+      <span className="w-5 text-muted text-sm tabular-nums">{rank}</span>
+      <Avatar name={name} url={avatarUrl} size={32} isBuck={isBuck} />
+      <span className="flex-1 font-medium">{name}</span>
+      <span className="tabular-nums font-semibold">{value}</span>
+      {sub && <span className="text-xs text-muted tabular-nums">{sub}</span>}
+    </li>
+  );
+});
+
+const BACStatRow = memo(function BACStatRow({
+  rank, name, avatarUrl, isBuck, bacValue, bacStatus,
+}: {
+  rank: number; name: string; avatarUrl: string | null;
+  isBuck: boolean; bacValue: number; bacStatus: string;
+}) {
+  const result = bacStatus === "ok"
+    ? ({ status: "ok" as const, value: bacValue })
+    : ({ status: "missing_profile" as const });
+  return (
+    <li className={`flex items-center gap-3 rounded-lg ${isBuck ? "bg-amber-50/50 -mx-2 px-2 py-1" : ""}`}>
+      <span className="w-5 text-muted text-sm tabular-nums">{rank}</span>
+      <Avatar name={name} url={avatarUrl} size={32} isBuck={isBuck} />
+      <span className="flex-1 font-medium">{name}</span>
+      <BACBadge result={result} />
+    </li>
+  );
+});
 
 export default function LeaderboardsPage() {
   const { user, loading } = useUser();
@@ -146,15 +182,15 @@ export default function LeaderboardsPage() {
                 .slice()
                 .sort((a, b) => b.drink_count - a.drink_count)
                 .map((r, i) => (
-                  <li key={r.id} className={`flex items-center gap-3 rounded-lg ${r.is_buck ? "bg-amber-50/50 -mx-2 px-2 py-1" : ""}`}>
-                    <span className="w-5 text-muted text-sm tabular-nums">{i + 1}</span>
-                    <Avatar name={r.name} url={r.avatar_url} size={32} isBuck={r.is_buck} />
-                    <span className="flex-1 font-medium">{r.name}</span>
-                    <span className="tabular-nums font-semibold">{r.drink_count}</span>
-                    <span className="text-xs text-muted tabular-nums">
-                      {Number(r.standard_drinks).toFixed(1)} std
-                    </span>
-                  </li>
+                  <StatRow
+                    key={r.id}
+                    rank={i + 1}
+                    name={r.name}
+                    avatarUrl={r.avatar_url}
+                    isBuck={r.is_buck}
+                    value={String(r.drink_count)}
+                    sub={`${Number(r.standard_drinks).toFixed(1)} std`}
+                  />
                 ))}
               {drinkBoard.length === 0 && (
                 <li className="text-sm text-muted text-center">No data.</li>
@@ -168,17 +204,15 @@ export default function LeaderboardsPage() {
                 .slice()
                 .sort((a, b) => Number(b.standard_drinks) - Number(a.standard_drinks))
                 .map((r, i) => (
-                  <li key={r.id} className={`flex items-center gap-3 rounded-lg ${r.is_buck ? "bg-amber-50/50 -mx-2 px-2 py-1" : ""}`}>
-                    <span className="w-5 text-muted text-sm tabular-nums">{i + 1}</span>
-                    <Avatar name={r.name} url={r.avatar_url} size={32} isBuck={r.is_buck} />
-                    <span className="flex-1 font-medium">{r.name}</span>
-                    <span className="tabular-nums font-semibold">
-                      {Number(r.standard_drinks).toFixed(1)}
-                    </span>
-                    <span className="text-xs text-muted tabular-nums">
-                      {r.drink_count} drinks
-                    </span>
-                  </li>
+                  <StatRow
+                    key={r.id}
+                    rank={i + 1}
+                    name={r.name}
+                    avatarUrl={r.avatar_url}
+                    isBuck={r.is_buck}
+                    value={Number(r.standard_drinks).toFixed(1)}
+                    sub={`${r.drink_count} drinks`}
+                  />
                 ))}
               {drinkBoard.length === 0 && (
                 <li className="text-sm text-muted text-center">No data.</li>
@@ -189,13 +223,16 @@ export default function LeaderboardsPage() {
           {tab === "bac" && (
             <ul className="flex flex-col gap-3">
               {bacRows.map((row, i) => (
-                <li key={row.user.id} className={`flex items-center gap-3 rounded-lg ${row.user.is_buck ? "bg-amber-50/50 -mx-2 px-2 py-1" : ""}`}>
-                  <span className="w-5 text-muted text-sm tabular-nums">{i + 1}</span>
-                  <Avatar name={row.user.name} url={row.user.avatar_url} size={32} isBuck={row.user.is_buck} />
-                  <span className="flex-1 font-medium">{row.user.name}</span>
-                  <BACBadge result={row.bac} />
-                </li>
-              ))}
+                  <BACStatRow
+                    key={row.user.id}
+                    rank={i + 1}
+                    name={row.user.name}
+                    avatarUrl={row.user.avatar_url}
+                    isBuck={row.user.is_buck}
+                    bacValue={row.bac.status === "ok" ? row.bac.value : -1}
+                    bacStatus={row.bac.status}
+                  />
+                ))}
               {bacRows.length === 0 && (
                 <li className="text-sm text-muted text-center">No data.</li>
               )}
@@ -205,14 +242,16 @@ export default function LeaderboardsPage() {
           {tab === "games" && (
             <ul className="flex flex-col gap-3">
               {gameRows.map((r, i) => (
-                <li key={r.user_id} className={`flex items-center gap-3 rounded-lg ${r.is_buck ? "bg-amber-50/50 -mx-2 px-2 py-1" : ""}`}>
-                  <span className="w-5 text-muted text-sm tabular-nums">{i + 1}</span>
-                  <Avatar name={r.name} url={r.avatar_url} size={32} isBuck={r.is_buck} />
-                  <span className="flex-1 font-medium">{r.name}</span>
-                  <span className="tabular-nums font-semibold">{r.wins} W</span>
-                  <span className="text-xs text-muted tabular-nums">{r.total} pts</span>
-                </li>
-              ))}
+                  <StatRow
+                    key={r.user_id}
+                    rank={i + 1}
+                    name={r.name}
+                    avatarUrl={r.avatar_url}
+                    isBuck={r.is_buck}
+                    value={`${r.wins} W`}
+                    sub={`${r.total} pts`}
+                  />
+                ))}
               {gameRows.length === 0 && (
                 <li className="text-sm text-muted text-center">No data.</li>
               )}
@@ -222,13 +261,15 @@ export default function LeaderboardsPage() {
           {tab === "overall" && (
             <ul className="flex flex-col gap-3">
               {overallRows.map((r, i) => (
-                <li key={r.user.id} className={`flex items-center gap-3 rounded-lg ${r.user.is_buck ? "bg-amber-50/50 -mx-2 px-2 py-1" : ""}`}>
-                  <span className="w-5 text-muted text-sm tabular-nums">{i + 1}</span>
-                  <Avatar name={r.user.name} url={r.user.avatar_url} size={32} isBuck={r.user.is_buck} />
-                  <span className="flex-1 font-medium">{r.user.name}</span>
-                  <span className="text-xs text-muted">drinks + game wins</span>
-                </li>
-              ))}
+                  <StatRow
+                    key={r.user.id}
+                    rank={i + 1}
+                    name={r.user.name}
+                    avatarUrl={r.user.avatar_url}
+                    isBuck={r.user.is_buck}
+                    value="drinks + game wins"
+                  />
+                ))}
               {overallRows.length === 0 && (
                 <li className="text-sm text-muted text-center">No data.</li>
               )}
