@@ -54,6 +54,8 @@ const CATEGORIES: { label: string; ids: string[] }[] = [
       "cheers-club",
       "in-sync",
       "drinking-buddy",
+      "creature-of-habit",
+      "double-down",
       "heavyweight",
       "peak-performer",
       "iron-liver",

@@ -65,6 +65,8 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "cheers-club", title: "Cheers Club", blurb: "Matched another buck's drink.", icon: "🍻", tier: "fun", timing: "live" },
   { id: "in-sync", title: "In Sync", blurb: "Logged a drink within 60s of another buck.", icon: "🥂", tier: "fun", timing: "live" },
   { id: "drinking-buddy", title: "Drinking Buddy", blurb: "Matched 3+ different drinks with other bucks.", icon: "👯", tier: "win", timing: "live" },
+  { id: "creature-of-habit", title: "Creature of Habit", blurb: "Drank the same drink 3+ times.", icon: "🦎", tier: "win", timing: "live" },
+  { id: "double-down", title: "Double Down", blurb: "Two drinks logged within 5 minutes.", icon: "🃏", tier: "fun", timing: "live" },
   // Drinks — end-of-day
   { id: "heavyweight", title: "Heavyweight", blurb: "Most standard drinks of the night.", icon: "🧱", tier: "win", timing: "endOfDay" },
   { id: "light-touch", title: "Light Touch", blurb: "3+ drinks, every one under 4% ABV.", icon: "🍃", tier: "fun", timing: "endOfDay" },
@@ -262,6 +264,27 @@ export function earnedForUser(
       );
     });
     if (inSync) out.push(make("in-sync", userId, "within 60s"));
+
+    const labelCounts = new Map<string, number>();
+    for (const d of userDrinks) {
+      if (d.label) {
+        labelCounts.set(d.label, (labelCounts.get(d.label) ?? 0) + 1);
+      }
+    }
+    for (const [lbl, cnt] of labelCounts) {
+      if (cnt >= 3) {
+        out.push(make("creature-of-habit", userId, `${lbl} ×${cnt}`));
+        break;
+      }
+    }
+
+    const sorted = [...userTimes].sort((a, b) => a - b);
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i] - sorted[i - 1] <= 5 * 60 * 1000) {
+        out.push(make("double-down", userId, `≤5 min apart`));
+        break;
+      }
+    }
   }
 
   // ── DRINKS (end-of-day) ────────────────────────────────────────────────
