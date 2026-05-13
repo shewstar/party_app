@@ -624,14 +624,23 @@ function RecapPageInner() {
                     <div className="text-xs text-muted truncate">{badge.blurb}</div>
                   </div>
                   <div className="flex -space-x-2">
-                    {us.slice(0, 4).map((u) => (
-                      <Avatar key={u.id} name={u.name} url={u.avatar_url} size={24} isBuck={u.is_buck} />
-                    ))}
-                    {us.length > 4 && (
-                      <span className="text-xs text-muted ml-1 self-center">
-                        +{us.length - 4}
-                      </span>
-                    )}
+                    {(() => {
+                      // Belt-and-suspenders: dedup right at the render site
+                      // in case anything upstream produces duplicate users.
+                      const uniq = Array.from(new Map(us.map((u) => [u.id, u])).values());
+                      return (
+                        <>
+                          {uniq.slice(0, 4).map((u) => (
+                            <Avatar key={u.id} name={u.name} url={u.avatar_url} size={24} isBuck={u.is_buck} />
+                          ))}
+                          {uniq.length > 4 && (
+                            <span className="text-xs text-muted ml-1 self-center">
+                              +{uniq.length - 4}
+                            </span>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </li>
               ))}
