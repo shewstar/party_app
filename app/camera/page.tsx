@@ -39,6 +39,19 @@ export default function CameraPage() {
     setError(null);
     setPermissionAsked(true);
     stopStream();
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      const insecure =
+        typeof window !== "undefined" &&
+        window.location.protocol !== "https:" &&
+        window.location.hostname !== "localhost" &&
+        window.location.hostname !== "127.0.0.1";
+      setError(
+        insecure
+          ? `Camera needs HTTPS. Open this page over https:// (or via localhost). You're on ${window.location.protocol}//${window.location.host}.`
+          : "Camera API isn't available in this browser.",
+      );
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
