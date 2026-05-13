@@ -231,6 +231,7 @@ export default function HomePage() {
         <Tile href="/vote" icon="🗳️" label="Vote" sub="Propose rules" badge={newVoteCount} />
         <Tile href="/itinerary" icon="📋" label="Itinerary" sub="What's happening" />
         <Tile href="/spin" icon="🎰" label="Spin" sub="Pick someone" />
+        <Tile href="/timeline" icon="📜" label="Timeline" sub="Live feed" />
         <Tile
           href="/camera"
           icon="📷"
