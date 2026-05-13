@@ -2,12 +2,14 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import TopBar from "@/components/TopBar";
 import Card from "@/components/Card";
 import Chip from "@/components/Chip";
 import Avatar from "@/components/Avatar";
 import BigButton from "@/components/BigButton";
 import DisclaimerFooter from "@/components/DisclaimerFooter";
+import AchievementBadge from "@/components/AchievementBadge";
 import { supabase } from "@/lib/supabase/browser";
 import { peakBAC, formatBAC } from "@/lib/bac";
 import {
@@ -21,11 +23,16 @@ import {
   topDrinkLabel,
   voteStats,
 } from "@/lib/recap";
+import { earnedForUser, evaluateAchievements } from "@/lib/achievements";
 import { useUser } from "@/lib/user-context";
 import type {
+  CameraPhotoRow,
   DrinkRow,
+  GamePlayerRow,
   GameRow,
+  GameScoreRow,
   GameTotalsRow,
+  SpinRow,
   UserRow,
   VoteItemRow,
   VoteResponseRow,
@@ -51,10 +58,15 @@ function RecapPageInner() {
   const [drinks, setDrinks] = useState<DrinkRow[]>([]);
   const [games, setGames] = useState<GameRow[]>([]);
   const [gameTotals, setGameTotals] = useState<GameTotalsRow[]>([]);
+  const [gamePlayers, setGamePlayers] = useState<GamePlayerRow[]>([]);
+  const [gameScores, setGameScores] = useState<GameScoreRow[]>([]);
   const [voteItems, setVoteItems] = useState<VoteItemRow[]>([]);
   const [voteResponses, setVoteResponses] = useState<VoteResponseRow[]>([]);
   const [voteTally, setVoteTally] = useState<VoteTallyRow[]>([]);
+  const [spins, setSpins] = useState<SpinRow[]>([]);
+  const [photos, setPhotos] = useState<CameraPhotoRow[]>([]);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
   async function load() {
     const s = supabase();
@@ -63,25 +75,37 @@ function RecapPageInner() {
       { data: d },
       { data: gm },
       { data: g },
+      { data: gpr },
+      { data: gsc },
       { data: vi },
       { data: vr },
       { data: vt },
+      { data: sp },
+      { data: ph },
     ] = await Promise.all([
       s.from("users").select("*"),
       s.from("drink_entries").select("*"),
       s.from("games").select("*"),
       s.from("v_game_totals").select("*"),
+      s.from("game_players").select("*"),
+      s.from("game_scores").select("*"),
       s.from("vote_items").select("*"),
       s.from("vote_responses").select("*"),
       s.from("v_vote_tally").select("*"),
+      s.from("spins").select("*"),
+      s.from("camera_photos").select("*"),
     ]);
     setUsers((u ?? []) as UserRow[]);
     setDrinks((d ?? []) as DrinkRow[]);
     setGames((gm ?? []) as GameRow[]);
     setGameTotals((g ?? []) as GameTotalsRow[]);
+    setGamePlayers((gpr ?? []) as GamePlayerRow[]);
+    setGameScores((gsc ?? []) as GameScoreRow[]);
     setVoteItems((vi ?? []) as VoteItemRow[]);
     setVoteResponses((vr ?? []) as VoteResponseRow[]);
     setVoteTally((vt ?? []) as VoteTallyRow[]);
+    setSpins((sp ?? []) as SpinRow[]);
+    setPhotos((ph ?? []) as CameraPhotoRow[]);
   }
 
   useEffect(() => {
@@ -94,8 +118,11 @@ function RecapPageInner() {
       .on("postgres_changes", { event: "*", schema: "public", table: "users" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "game_scores" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "games" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "game_players" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "vote_items" }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "vote_responses" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "spins" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "camera_photos" }, load)
       .subscribe();
     return () => {
       s.removeChannel(ch);
@@ -138,13 +165,78 @@ function RecapPageInner() {
     () => voteTally.filter((t) => windowedVoteIds.has(t.id)),
     [voteTally, windowedVoteIds],
   );
-  const windowedGameIds = useMemo(
-    () => new Set(games.filter((gm) => inWindow(gm.created_at)).map((gm) => gm.id)),
+  const windowedGames = useMemo(
+    () => games.filter((gm) => inWindow(gm.created_at)),
     [games, dayWindow.startMs, dayWindow.endMs],
+  );
+  const windowedGameIds = useMemo(
+    () => new Set(windowedGames.map((gm) => gm.id)),
+    [windowedGames],
   );
   const windowedGameTotals = useMemo(
     () => gameTotals.filter((t) => windowedGameIds.has(t.game_id)),
     [gameTotals, windowedGameIds],
+  );
+  const windowedGamePlayers = useMemo(
+    () => gamePlayers.filter((p) => windowedGameIds.has(p.game_id)),
+    [gamePlayers, windowedGameIds],
+  );
+  const windowedGameScores = useMemo(
+    () => gameScores.filter((s) => windowedGameIds.has(s.game_id)),
+    [gameScores, windowedGameIds],
+  );
+  const windowedSpins = useMemo(
+    () => spins.filter((s) => inWindow(s.created_at)),
+    [spins, dayWindow.startMs, dayWindow.endMs],
+  );
+  const windowedPhotos = useMemo(
+    () => photos.filter((p) => p.party_day === selectedDay),
+    [photos, selectedDay],
+  );
+
+  const achievementCtx = useMemo(
+    () => ({
+      users,
+      drinks: windowedDrinks,
+      voteItems: windowedVoteItems,
+      voteResponses: windowedVoteResponses,
+      voteTally: windowedVoteTally,
+      games: windowedGames,
+      gamePlayers: windowedGamePlayers,
+      gameScores: windowedGameScores,
+      gameTotals: windowedGameTotals,
+      spins: windowedSpins,
+      photos: windowedPhotos,
+      windowStartMs: dayWindow.startMs,
+      windowEndMs: dayWindow.endMs,
+    }),
+    [
+      users,
+      windowedDrinks,
+      windowedVoteItems,
+      windowedVoteResponses,
+      windowedVoteTally,
+      windowedGames,
+      windowedGamePlayers,
+      windowedGameScores,
+      windowedGameTotals,
+      windowedSpins,
+      windowedPhotos,
+      dayWindow.startMs,
+      dayWindow.endMs,
+    ],
+  );
+
+  const phase: "live" | "final" = selectedDay === todayKey ? "live" : "final";
+
+  const myBadges = useMemo(
+    () => (user ? earnedForUser(achievementCtx, user.id, phase) : []),
+    [achievementCtx, user, phase],
+  );
+
+  const allBadges = useMemo(
+    () => evaluateAchievements(achievementCtx, phase),
+    [achievementCtx, phase],
   );
 
   const myDrinks = useMemo(
@@ -268,6 +360,10 @@ function RecapPageInner() {
       `🗳️ Voted: ${personal.votes.cast} cast / ${personal.votes.proposalsWon} won / ${personal.votes.proposalsLost} lost`,
     );
     lines.push(`🏆 Game wins: ${personal.wins}`);
+    if (myBadges.length > 0) {
+      const top = myBadges.slice(0, 3).map((b) => `${b.icon} ${b.title}`);
+      lines.push(`— ${top.join(" · ")}`);
+    }
     return lines.join("\n");
   }
 
@@ -304,6 +400,27 @@ function RecapPageInner() {
   }
 
   const isEmpty = windowedDrinks.length === 0;
+
+  const userById = new Map(users.map((u) => [u.id, u]));
+  const myBadgesByTier = {
+    win: myBadges.filter((b) => b.tier === "win"),
+    fail: myBadges.filter((b) => b.tier === "fail"),
+    fun: myBadges.filter((b) => b.tier === "fun"),
+  };
+  const myBadgeKeys = new Set(myBadges.map((b) => b.key));
+  const otherBadgesById = new Map<string, { badge: typeof allBadges[number]; users: UserRow[] }>();
+  for (const b of allBadges) {
+    if (b.userId === user?.id) continue;
+    if (myBadgeKeys.has(b.key)) continue;
+    const u = userById.get(b.userId);
+    if (!u) continue;
+    const entry = otherBadgesById.get(b.id);
+    if (entry) entry.users.push(u);
+    else otherBadgesById.set(b.id, { badge: b, users: [u] });
+  }
+  const otherBadgeRows = [...otherBadgesById.values()].sort((a, b) =>
+    a.badge.tier === b.badge.tier ? 0 : a.badge.tier === "win" ? -1 : 1,
+  );
 
   return (
     <main className="flex-1 flex flex-col">
@@ -361,6 +478,44 @@ function RecapPageInner() {
         </Card>
 
         <Card>
+          <h2 className="font-semibold mb-1">Your achievements</h2>
+          {phase === "live" ? (
+            <p className="text-xs text-muted mb-3">
+              End-of-night badges reveal after 5am.
+            </p>
+          ) : (
+            <p className="text-xs text-muted mb-3">
+              {myBadges.length === 0
+                ? "No badges earned this night."
+                : `${myBadges.length} badge${myBadges.length === 1 ? "" : "s"} earned.`}
+            </p>
+          )}
+          {myBadges.length === 0 ? (
+            <p className="text-sm text-muted">
+              Quiet night so far — get amongst it.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {(["win", "fun", "fail"] as const).map((tier) => {
+                const list = myBadgesByTier[tier];
+                if (list.length === 0) return null;
+                const label = tier === "win" ? "Wins" : tier === "fail" ? "Fails" : "Fun";
+                return (
+                  <div key={tier} className="flex flex-col gap-2">
+                    <div className="text-xs uppercase tracking-wide text-muted">
+                      {label}
+                    </div>
+                    {list.map((b) => (
+                      <AchievementBadge key={b.key} badge={b} />
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+
+        <Card>
           <h2 className="font-semibold mb-3">Party superlatives</h2>
           {isEmpty ? (
             <p className="text-sm text-muted">Nothing logged for this night.</p>
@@ -409,6 +564,99 @@ function RecapPageInner() {
             </ul>
           )}
         </Card>
+
+        {otherBadgeRows.length > 0 && (
+          <Card>
+            <h2 className="font-semibold mb-3">Badges around the room</h2>
+            <ul className="flex flex-col gap-3">
+              {otherBadgeRows.map(({ badge, users: us }) => (
+                <li key={badge.id} className="flex items-center gap-3">
+                  <span className="text-xl shrink-0" aria-hidden>
+                    {badge.icon}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{badge.title}</div>
+                    <div className="text-xs text-muted truncate">{badge.blurb}</div>
+                  </div>
+                  <div className="flex -space-x-2">
+                    {us.slice(0, 4).map((u) => (
+                      <Avatar key={u.id} name={u.name} url={u.avatar_url} size={24} />
+                    ))}
+                    {us.length > 4 && (
+                      <span className="text-xs text-muted ml-1 self-center">
+                        +{us.length - 4}
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+
+        <Card>
+          <h2 className="font-semibold mb-3">
+            {phase === "live" ? "Tonight's roll" : "Photo roll"}
+          </h2>
+          {phase === "live" ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-muted">
+                🎞 Tonight's roll develops at 5am.
+              </p>
+              <Link href="/camera" className="text-sm text-accent underline self-start">
+                Open camera →
+              </Link>
+            </div>
+          ) : windowedPhotos.length === 0 ? (
+            <p className="text-sm text-muted">No photos developed for this night.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {windowedPhotos.map((p, i) => {
+                const photographer = userById.get(p.user_id);
+                return (
+                  <button
+                    type="button"
+                    key={p.id}
+                    onClick={() => setLightboxIdx(i)}
+                    className="relative rounded-card overflow-hidden border border-line bg-surface shadow-card"
+                  >
+                    <img
+                      src={p.photo_url}
+                      alt=""
+                      loading="lazy"
+                      className="w-full aspect-square object-cover"
+                    />
+                    {photographer && (
+                      <div className="absolute bottom-1 left-1 right-1 flex items-center gap-2 bg-black/55 text-white rounded-full px-2 py-1">
+                        <Avatar
+                          name={photographer.name}
+                          url={photographer.avatar_url}
+                          size={20}
+                        />
+                        <span className="text-xs truncate">{photographer.name}</span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+
+        {lightboxIdx !== null && windowedPhotos[lightboxIdx] && (
+          <button
+            type="button"
+            onClick={() => setLightboxIdx(null)}
+            className="fixed inset-0 z-40 bg-black/90 flex items-center justify-center p-4"
+            aria-label="Close photo"
+          >
+            <img
+              src={windowedPhotos[lightboxIdx].photo_url}
+              alt=""
+              className="max-w-full max-h-full object-contain"
+            />
+          </button>
+        )}
 
         <BigButton onClick={onShare} className="py-5 text-lg">
           📣 Share recap

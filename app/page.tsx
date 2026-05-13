@@ -11,6 +11,7 @@ import DisclaimerFooter from "@/components/DisclaimerFooter";
 import { supabase } from "@/lib/supabase/browser";
 import { estimateBAC } from "@/lib/bac";
 import { useUser } from "@/lib/user-context";
+import { useAchievements } from "@/lib/achievements-tracker";
 import { partyDayKey } from "@/lib/recap";
 import type { DrinkRow, DrinksLeaderboardRow, VoteTallyRow } from "@/lib/supabase/types";
 
@@ -18,6 +19,7 @@ const CAMERA_DAILY_LIMIT = 3;
 
 export default function HomePage() {
   const { user, loading } = useUser();
+  const { liveEarned } = useAchievements();
   const [myDrinks, setMyDrinks] = useState<DrinkRow[]>([]);
   const [board, setBoard] = useState<DrinksLeaderboardRow[]>([]);
   const [forItems, setForItems] = useState<VoteTallyRow[]>([]);
@@ -132,6 +134,28 @@ export default function HomePage() {
           </div>
         </div>
       </Card>
+
+      <Link
+        href="/recap"
+        className="bg-surface border border-line rounded-card shadow-card px-4 py-3 flex items-center gap-3"
+      >
+        <span className="text-2xl" aria-hidden>
+          {liveEarned[liveEarned.length - 1]?.icon ?? "🎖"}
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="text-xs uppercase tracking-wide text-muted">
+            Tonight's achievements
+          </div>
+          <div className="font-semibold truncate">
+            {liveEarned.length === 0
+              ? "None yet — get into it"
+              : liveEarned.length === 1
+                ? liveEarned[0].title
+                : `${liveEarned.length} earned · latest: ${liveEarned[liveEarned.length - 1].title}`}
+          </div>
+        </div>
+        <span className="text-muted text-sm">→</span>
+      </Link>
 
       <BigButton href="/drink" className="py-7 text-2xl">
         ➕ Add a Drink
