@@ -193,12 +193,12 @@ export default function FinskaBoard({ game, finished, onAutoFinish }: Props) {
             </div>
           ))}
         </div>
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 grid grid-cols-3 gap-2">
           <button
             type="button"
             onClick={onMiss}
             disabled={finished || submitting || !currentThrower}
-            className="flex-1 rounded-card border border-line bg-surface py-3 font-semibold disabled:opacity-50"
+            className="col-span-1 rounded-card border border-line bg-surface px-4 py-4 text-base font-semibold disabled:opacity-50"
           >
             Miss
           </button>
@@ -208,7 +208,7 @@ export default function FinskaBoard({ game, finished, onAutoFinish }: Props) {
             disabled={
               finished || submitting || !currentThrower || selected.size === 0
             }
-            className="flex-[2] rounded-card bg-accent text-white py-3 font-semibold disabled:opacity-50"
+            className="col-span-2 rounded-card bg-accent text-white px-4 py-4 text-base font-semibold disabled:opacity-50"
           >
             {selected.size === 0
               ? "Confirm"
@@ -218,8 +218,8 @@ export default function FinskaBoard({ game, finished, onAutoFinish }: Props) {
       </Card>
 
       {/* Player list */}
-      <Card padding="p-3">
-        <ul className="flex flex-col gap-2">
+      <Card padding="p-2">
+        <ul className="flex flex-col gap-1">
           {orderedPlayers.map((p) => {
             const u = usersById.get(p.user_id);
             if (!u) return null;
@@ -232,12 +232,12 @@ export default function FinskaBoard({ game, finished, onAutoFinish }: Props) {
               <li
                 key={p.user_id}
                 className={clsx(
-                  "flex items-center gap-3 rounded-card px-2 py-2",
+                  "flex items-center gap-3 rounded-card px-3 py-3",
                   isCurrent && "ring-2 ring-accent bg-accentSoft/40",
                   isElim && "opacity-50",
                 )}
               >
-                <Avatar name={u.name} url={u.avatar_url} size={32} isBuck={u.is_buck} />
+                <Avatar name={u.name} url={u.avatar_url} size={36} isBuck={u.is_buck} />
                 <div className="flex-1 min-w-0">
                   <div
                     className={clsx(
@@ -249,17 +249,17 @@ export default function FinskaBoard({ game, finished, onAutoFinish }: Props) {
                     {u.name}
                   </div>
                   {miss > 0 && !isElim && (
-                    <div className="text-xs text-muted">
+                    <div className="text-xs text-muted mt-0.5">
                       Misses: {miss}/{FINSKA.missLimit}
                     </div>
                   )}
                   {isElim && (
-                    <div className="text-xs text-danger">Eliminated</div>
+                    <div className="text-xs text-danger mt-0.5">Eliminated</div>
                   )}
                 </div>
-                <div className="text-right tabular-nums">
-                  <div className="font-semibold text-lg">{total}</div>
-                  <div className="text-xs text-muted">/ {FINSKA.winScore}</div>
+                <div className="flex items-baseline gap-1 tabular-nums pl-2">
+                  <span className="font-semibold text-2xl leading-none">{total}</span>
+                  <span className="text-xs text-muted">/ {FINSKA.winScore}</span>
                 </div>
               </li>
             );
@@ -269,18 +269,16 @@ export default function FinskaBoard({ game, finished, onAutoFinish }: Props) {
 
       {/* History feed */}
       {state.events.length > 0 && (
-        <Card padding="p-3">
-          <div className="text-xs font-semibold text-muted mb-2 px-1">
+        <Card padding="p-4">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted mb-3">
             Recent throws
           </div>
-          <ul className="flex flex-col gap-1 text-sm">
+          <ul className="flex flex-col gap-2 text-sm leading-snug">
             {[...state.events]
               .slice(-12)
               .reverse()
               .map((ev, i) => (
-                <li key={i} className="px-1">
-                  {formatEvent(ev, usersById)}
-                </li>
+                <li key={i}>{formatEvent(ev, usersById)}</li>
               ))}
           </ul>
         </Card>
