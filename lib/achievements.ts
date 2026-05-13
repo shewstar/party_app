@@ -261,12 +261,12 @@ export function earnedForUser(
     if (varietyAtMs !== undefined) {
       out.push(make("variety-pack", userId, "beer + wine + spirits", undefined, varietyAtMs));
     }
-    const after2Drink = userDrinks.find((d) => {
+    // Per-trigger: one Night Owl per post-2am drink.
+    for (const d of userDrinks) {
       const h = new Date(d.logged_at).getHours();
-      return h >= 2 && h < 5;
-    });
-    if (after2Drink) {
-      out.push(make("night-owl", userId, "after 2am", undefined, new Date(after2Drink.logged_at).getTime()));
+      if (h >= 2 && h < 5) {
+        out.push(make("night-owl", userId, "after 2am", d.id, new Date(d.logged_at).getTime()));
+      }
     }
 
     if (firstDrinkMs !== null) {
@@ -279,12 +279,15 @@ export function earnedForUser(
       userDrinks.map((d) => d.label).filter((l): l is string => !!l),
     );
     if (myLabels.size > 0) {
-      const myMatchingDrinks = userDrinks.filter(
-        (d) => d.label && ctx.drinks.some((x) => x.user_id !== userId && x.label === d.label),
-      );
-      if (myMatchingDrinks.length > 0) {
-        const t = Math.max(...myMatchingDrinks.map((d) => new Date(d.logged_at).getTime()));
-        out.push(make("cheers-club", userId, undefined, undefined, t));
+      // Per-trigger: one Cheers Club per matching user drink.
+      for (const d of userDrinks) {
+        if (!d.label) continue;
+        const matched = ctx.drinks.some(
+          (x) => x.user_id !== userId && x.label === d.label,
+        );
+        if (matched) {
+          out.push(make("cheers-club", userId, d.label, d.id, new Date(d.logged_at).getTime()));
+        }
       }
       const sharedLabels = new Set<string>();
       for (const lbl of myLabels) {
@@ -297,19 +300,18 @@ export function earnedForUser(
       }
     }
     const SIXTY_SEC = 60 * 1000;
-    let inSyncAtMs: number | undefined;
+    // Per-trigger: one In Sync per user drink that lands within 60s of another buck's.
     for (const my of userDrinks) {
       const myT = new Date(my.logged_at).getTime();
-      const match = ctx.drinks.find(
+      const match = ctx.drinks.some(
         (d) =>
           d.user_id !== userId &&
           Math.abs(new Date(d.logged_at).getTime() - myT) <= SIXTY_SEC,
       );
       if (match) {
-        inSyncAtMs = Math.max(inSyncAtMs ?? 0, myT);
+        out.push(make("in-sync", userId, "within 60s", my.id, myT));
       }
     }
-    if (inSyncAtMs !== undefined) out.push(make("in-sync", userId, "within 60s", undefined, inSyncAtMs));
 
     const labelCountsMap = new Map<string, { count: number; thirdAt?: number }>();
     for (const d of userDrinks.slice().sort((a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime())) {
@@ -326,10 +328,15 @@ export function earnedForUser(
       }
     }
 
-    for (let i = 1; i < sortedDrinkTimes.length; i++) {
-      if (sortedDrinkTimes[i] - sortedDrinkTimes[i - 1] <= 5 * 60 * 1000) {
-        out.push(make("double-down", userId, `≤5 min apart`, undefined, sortedDrinkTimes[i]));
-        break;
+    // Per-trigger: one Double Down per ≤5min consecutive pair.
+    const drinksByTime = [...userDrinks].sort(
+      (a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime(),
+    );
+    for (let i = 1; i < drinksByTime.length; i++) {
+      const cur = new Date(drinksByTime[i].logged_at).getTime();
+      const prev = new Date(drinksByTime[i - 1].logged_at).getTime();
+      if (cur - prev <= 5 * 60 * 1000) {
+        out.push(make("double-down", userId, `≤5 min apart`, drinksByTime[i].id, cur));
       }
     }
   }
@@ -614,8 +621,9 @@ export function earnedForUser(
   const pooledSpinTimes = pooledSpins.map((s) => new Date(s.created_at).getTime()).sort((a, b) => a - b);
   const lastPooledMs = pooledSpinTimes.length ? pooledSpinTimes[pooledSpinTimes.length - 1] : undefined;
   if (wantLive) {
-    if (wonSpins.length >= 1) {
-      out.push(make("chosen-one", userId, undefined, undefined, wonSpinTimes[0]));
+    // Per-trigger: one Chosen One per spin won.
+    for (const s of wonSpins) {
+      out.push(make("chosen-one", userId, undefined, s.id, new Date(s.created_at).getTime()));
     }
     if (wonSpins.length >= 3) {
       out.push(make("magnet", userId, `${wonSpins.length}× picked`, undefined, wonSpinTimes[2]));
@@ -690,9 +698,10 @@ export function earnedForUser(
     if (hypeAtMs !== undefined) {
       out.push(make("hype-buck", userId, `${seenEvents.size} events`, undefined, hypeAtMs));
     }
-    const doomReaction = myReactions.find((r) => r.reaction === "💀");
-    if (doomReaction) {
-      out.push(make("doom-buck", userId, undefined, undefined, new Date(doomReaction.created_at).getTime()));
+    // Per-trigger: one Doom Buck per 💀 reaction.
+    for (const r of myReactions) {
+      if (r.reaction !== "💀") continue;
+      out.push(make("doom-buck", userId, undefined, `${r.event_id}:${r.user_id}`, new Date(r.created_at).getTime()));
     }
     // Time when 6th distinct emoji was first used.
     const seenEmoji = new Set<string>();
@@ -722,16 +731,16 @@ export function earnedForUser(
         out.push(make("trendsetter", userId, "first react", evt.id, new Date(sorted[0].created_at).getTime()));
       }
     }
+    // Per-trigger: one Punctual per <10min reaction (one event = one badge).
     const TEN_MIN = 10 * 60 * 1000;
-    const punctualReaction = myReactions.find((r) => {
+    for (const r of myReactions) {
       const evt = ctx.itineraryEvents.find((e) => e.id === r.event_id);
-      if (!evt) return false;
+      if (!evt) continue;
       const delta =
         new Date(r.created_at).getTime() - new Date(evt.created_at).getTime();
-      return delta >= 0 && delta <= TEN_MIN;
-    });
-    if (punctualReaction) {
-      out.push(make("punctual", userId, "<10 min", undefined, new Date(punctualReaction.created_at).getTime()));
+      if (delta >= 0 && delta <= TEN_MIN) {
+        out.push(make("punctual", userId, "<10 min", r.event_id, new Date(r.created_at).getTime()));
+      }
     }
   }
   if (wantEnd) {

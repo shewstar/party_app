@@ -5,6 +5,7 @@ import { AchievementsProvider } from "@/lib/achievements-tracker";
 import AchievementToast from "@/components/AchievementToast";
 import PushPermissionBanner from "@/components/PushPermissionBanner";
 import OfflineBanner from "@/components/OfflineBanner";
+import StorageBoot from "@/components/StorageBoot";
 import { BatteryProvider } from "@/lib/battery";
 import { RealtimeProvider } from "@/lib/realtime-provider";
 
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="font-sans">
+        <StorageBoot />
         <BatteryProvider>
         <RealtimeProvider>
         <UserProvider>

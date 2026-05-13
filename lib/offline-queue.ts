@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { vkey } from "./storage";
 
 type QueuedWrite = {
   id: string;
@@ -10,7 +11,7 @@ type QueuedWrite = {
   attempts: number;
 };
 
-const QUEUE_KEY = "bucksOfflineQueue";
+const QUEUE_KEY = vkey("offlineQueue");
 const MAX_ITEMS = 50;
 const MAX_ATTEMPTS = 5;
 const DEDUP_WINDOW_MS = 2000;

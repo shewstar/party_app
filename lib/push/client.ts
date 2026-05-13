@@ -1,6 +1,8 @@
 "use client";
 
-const PERMISSION_DISMISSED_KEY = "pushPermissionDismissed";
+import { vkey } from "../storage";
+
+const PERMISSION_DISMISSED_KEY = vkey("pushPermissionDismissed");
 
 function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);

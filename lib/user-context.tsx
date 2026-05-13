@@ -14,13 +14,13 @@ import type { UserRow } from "./supabase/types";
 import { getOrCreateUserId, getUserId } from "./session";
 import { partyDayKey } from "./recap";
 import { useTableData, useRealtimeReady } from "./realtime-provider";
+import { vkey } from "./storage";
 
 const APP_OPEN_THROTTLE_MS = 5 * 60 * 1000;
-const APP_OPEN_KEY_PREFIX = "lastAppOpen";
 
 async function logAppOpen(userId: string) {
   try {
-    const key = `${APP_OPEN_KEY_PREFIX}:${userId}`;
+    const key = vkey(`lastAppOpen:${userId}`);
     const last = Number(localStorage.getItem(key) ?? 0);
     const now = Date.now();
     if (last && now - last < APP_OPEN_THROTTLE_MS) return;

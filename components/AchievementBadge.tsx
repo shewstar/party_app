@@ -17,9 +17,11 @@ const tierLabel: Record<Tier, string> = {
 export default function AchievementBadge({
   badge,
   size = "md",
+  count = 1,
 }: {
   badge: EarnedBadge;
   size?: "sm" | "md";
+  count?: number;
 }) {
   const compact = size === "sm";
   return (
@@ -34,8 +36,15 @@ export default function AchievementBadge({
         {badge.icon}
       </span>
       <div className="flex-1 min-w-0">
-        <div className={clsx("font-semibold truncate", compact ? "text-sm" : "text-base")}>
-          {badge.title}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={clsx("font-semibold truncate", compact ? "text-sm" : "text-base")}>
+            {badge.title}
+          </span>
+          {count > 1 && (
+            <span className="shrink-0 text-xs font-semibold text-muted bg-line/50 rounded-full px-1.5 py-0.5 tabular-nums">
+              ×{count}
+            </span>
+          )}
         </div>
         <div className={clsx("text-muted", compact ? "text-xs" : "text-sm")}>
           {badge.blurb}

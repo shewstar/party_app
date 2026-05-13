@@ -1,6 +1,8 @@
 "use client";
 
-const USER_ID_KEY = "bucks.user_id";
+import { vkey } from "./storage";
+
+const USER_ID_KEY = vkey("user_id");
 
 function genUUID(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {

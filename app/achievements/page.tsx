@@ -1,42 +1,17 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useMemo } from "react";
 import TopBar from "@/components/TopBar";
 import Card from "@/components/Card";
-import Chip from "@/components/Chip";
 import clsx from "@/components/clsx";
 import {
-  availablePartyDays,
-  formatPartyDay,
-  partyDayKey,
-  partyDayWindow,
-} from "@/lib/recap";
-import {
   ACHIEVEMENTS,
-  earnedForUser,
   type Achievement,
-  type EarnedBadge,
 } from "@/lib/achievements";
 import { formatEarnedAt } from "@/lib/timeline-events";
 import { useUser } from "@/lib/user-context";
-import { useTableData } from "@/lib/realtime-provider";
-import type {
-  AppOpenRow,
-  CameraPhotoRow,
-  DrinkRow,
-  GamePlayerRow,
-  GameRow,
-  GameScoreRow,
-  GameTotalsRow,
-  ItineraryEventRow,
-  ItineraryReactionRow,
-  SpinRow,
-  UserRow,
-  VoteItemRow,
-  VoteResponseRow,
-  VoteTallyRow,
-} from "@/lib/supabase/types";
+import { useAllEarnedBadges } from "@/lib/achievements-tracker";
+import type { StoredBadge } from "@/lib/achievements-storage";
 
 const CATEGORIES: { label: string; ids: string[] }[] = [
   {
@@ -163,12 +138,17 @@ const tierLabel: Record<Achievement["tier"], string> = {
 
 function Row({
   badge,
-  earned,
+  entries,
 }: {
   badge: Achievement;
-  earned: EarnedBadge | undefined;
+  entries: StoredBadge[];
 }) {
-  const got = !!earned;
+  const got = entries.length > 0;
+  // Latest is the most recent earning across all instances/nights.
+  const latest = got
+    ? entries.reduce((a, b) => (a.earnedAtMs >= b.earnedAtMs ? a : b))
+    : undefined;
+  const count = entries.length;
   return (
     <div
       className={clsx(
@@ -183,18 +163,25 @@ function Row({
         {got ? badge.icon : "🔒"}
       </span>
       <div className="flex-1 min-w-0">
-        <div
-          className={clsx(
-            "font-semibold truncate text-sm",
-            !got && "text-muted",
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span
+            className={clsx(
+              "font-semibold truncate text-sm",
+              !got && "text-muted",
+            )}
+          >
+            {badge.title}
+          </span>
+          {count > 1 && (
+            <span className="shrink-0 text-xs font-semibold text-muted bg-line/50 rounded-full px-1.5 py-0.5 tabular-nums">
+              ×{count}
+            </span>
           )}
-        >
-          {badge.title}
         </div>
         <div className="text-xs text-muted">{badge.blurb}</div>
-        {got && earned!.earnedAtMs !== undefined && (
+        {latest && (
           <div className="text-xs text-accent font-medium tabular-nums">
-            {formatEarnedAt(earned!.earnedAtMs, Date.now())}
+            {formatEarnedAt(latest.earnedAtMs, Date.now())}
           </div>
         )}
       </div>
@@ -211,120 +198,18 @@ function Row({
 }
 
 export default function AchievementsPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>
-      }
-    >
-      <AchievementsInner />
-    </Suspense>
-  );
-}
-
-function AchievementsInner() {
   const { user, loading } = useUser();
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const allEarned = useAllEarnedBadges();
 
-  const { data: users } = useTableData<UserRow>("users");
-  const { data: drinks } = useTableData<DrinkRow>("drink_entries");
-  const { data: voteItems } = useTableData<VoteItemRow>("vote_items");
-  const { data: voteResponses } = useTableData<VoteResponseRow>("vote_responses");
-  const { data: voteTally } = useTableData<VoteTallyRow>("v_vote_tally");
-  const { data: games } = useTableData<GameRow>("games");
-  const { data: gamePlayers } = useTableData<GamePlayerRow>("game_players");
-  const { data: gameScores } = useTableData<GameScoreRow>("game_scores");
-  const { data: gameTotals } = useTableData<GameTotalsRow>("v_game_totals");
-  const { data: spins } = useTableData<SpinRow>("spins");
-  const { data: photos } = useTableData<CameraPhotoRow>("camera_photos");
-  const { data: itineraryEvents } = useTableData<ItineraryEventRow>("itinerary_events");
-  const { data: itineraryReactions } = useTableData<ItineraryReactionRow>("itinerary_reactions");
-  const { data: appOpens } = useTableData<AppOpenRow>("app_opens");
-
-  const todayKey = useMemo(() => partyDayKey(Date.now()), []);
-  const selectedDay = searchParams.get("day") ?? todayKey;
-  const dayWindow = useMemo(() => partyDayWindow(selectedDay), [selectedDay]);
-
-  const dayOptions = useMemo(() => {
-    const keys = new Set(availablePartyDays(drinks));
-    for (const o of appOpens) keys.add(o.party_day);
-    for (const p of photos) keys.add(p.party_day);
-    for (const sp of spins) keys.add(partyDayKey(sp.created_at));
-    for (const g of games) keys.add(partyDayKey(g.created_at));
-    for (const vi of voteItems) keys.add(partyDayKey(vi.created_at));
-    for (const ev of itineraryEvents) keys.add(partyDayKey(ev.created_at));
-    keys.add(todayKey);
-    return [...keys].sort((a, b) => (a < b ? 1 : -1));
-  }, [drinks, appOpens, photos, spins, games, voteItems, itineraryEvents, todayKey]);
-
-  const inWindow = (ts: string | null | undefined) => {
-    if (!ts) return false;
-    const t = new Date(ts).getTime();
-    return t >= dayWindow.startMs && t < dayWindow.endMs;
-  };
-
-  const achievementCtx = useMemo(() => {
-    const windowedGames = games.filter((g) => inWindow(g.created_at));
-    const windowedGameIds = new Set(windowedGames.map((g) => g.id));
-    const windowedVoteItems = voteItems.filter((i) => inWindow(i.created_at));
-    const windowedVoteIds = new Set(windowedVoteItems.map((i) => i.id));
-    const windowedEvents = itineraryEvents.filter((e) => inWindow(e.created_at));
-    const windowedEventIds = new Set(windowedEvents.map((e) => e.id));
-    return {
-      users,
-      drinks: drinks.filter((d) => inWindow(d.logged_at)),
-      voteItems: windowedVoteItems,
-      voteResponses: voteResponses.filter((r) => windowedVoteIds.has(r.vote_item_id)),
-      voteTally: voteTally.filter((t) => windowedVoteIds.has(t.id)),
-      games: windowedGames,
-      gamePlayers: gamePlayers.filter((p) => windowedGameIds.has(p.game_id)),
-      gameScores: gameScores.filter((s) => windowedGameIds.has(s.game_id)),
-      gameTotals: gameTotals.filter((t) => windowedGameIds.has(t.game_id)),
-      spins: spins.filter((s) => inWindow(s.created_at)),
-      photos: photos.filter((p) => p.party_day === selectedDay),
-      itineraryEvents: windowedEvents,
-      itineraryReactions: itineraryReactions.filter((r) =>
-        windowedEventIds.has(r.event_id),
-      ),
-      appOpens: appOpens.filter((o) => o.party_day === selectedDay),
-      windowStartMs: dayWindow.startMs,
-      windowEndMs: dayWindow.endMs,
-    };
-  }, [
-    users,
-    drinks,
-    voteItems,
-    voteResponses,
-    voteTally,
-    games,
-    gamePlayers,
-    gameScores,
-    gameTotals,
-    spins,
-    photos,
-    itineraryEvents,
-    itineraryReactions,
-    appOpens,
-    selectedDay,
-    dayWindow.startMs,
-    dayWindow.endMs,
-  ]);
-
-  const phase: "live" | "final" = selectedDay === todayKey ? "live" : "final";
-
-  const earned = useMemo(
-    () => (user ? earnedForUser(achievementCtx, user.id, phase) : []),
-    [achievementCtx, user, phase],
-  );
-
-  const earnedById = useMemo(() => {
-    const map = new Map<string, EarnedBadge>();
-    for (const b of earned) {
-      if (!map.has(b.id)) map.set(b.id, b);
+  const entriesById = useMemo(() => {
+    const map = new Map<string, StoredBadge[]>();
+    for (const b of allEarned) {
+      const arr = map.get(b.id) ?? [];
+      arr.push(b);
+      map.set(b.id, arr);
     }
     return map;
-  }, [earned]);
+  }, [allEarned]);
 
   const orderedIds = useMemo(() => CATEGORIES.flatMap((c) => c.ids), []);
   const unknownIds = useMemo(
@@ -332,41 +217,24 @@ function AchievementsInner() {
     [orderedIds],
   );
 
-  function setDay(key: string) {
-    const sp = new URLSearchParams(searchParams.toString());
-    if (key === todayKey) sp.delete("day");
-    else sp.set("day", key);
-    router.replace(`/achievements${sp.toString() ? "?" + sp.toString() : ""}`);
-  }
-
   if (loading || !user) {
     return (
       <main className="flex-1 px-5 py-8 text-center text-muted">Loading…</main>
     );
   }
 
-  const earnedCount = earnedById.size;
+  const earnedCount = entriesById.size;
   const total = ACHIEVEMENTS.length;
 
   return (
     <main className="flex-1 flex flex-col">
       <TopBar title="Achievements" />
       <div className="px-5 py-4 flex flex-col gap-4">
-        {dayOptions.length > 1 && (
-          <div className="flex flex-wrap gap-2">
-            {dayOptions.map((k) => (
-              <Chip key={k} active={k === selectedDay} onClick={() => setDay(k)}>
-                {formatPartyDay(k, todayKey)}
-              </Chip>
-            ))}
-          </div>
-        )}
-
         <Card>
           <div className="flex items-baseline justify-between">
             <div>
               <div className="text-xs uppercase tracking-wide text-muted">
-                {formatPartyDay(selectedDay, todayKey)}
+                Your badge book
               </div>
               <div className="text-2xl font-bold tabular-nums">
                 {earnedCount}
@@ -376,11 +244,7 @@ function AchievementsInner() {
                 </span>
               </div>
             </div>
-            <div className="text-xs text-muted">
-              {phase === "live"
-                ? "Live — earn end-of-night badges at 5am"
-                : "Final"}
-            </div>
+            <div className="text-xs text-muted">All-time</div>
           </div>
         </Card>
 
@@ -388,7 +252,7 @@ function AchievementsInner() {
           const items = cat.ids
             .map((id) => ACHIEVEMENTS.find((a) => a.id === id))
             .filter((a): a is Achievement => !!a);
-          const gotInCat = items.filter((a) => earnedById.has(a.id)).length;
+          const gotInCat = items.filter((a) => entriesById.has(a.id)).length;
           return (
             <section key={cat.label} className="flex flex-col gap-2">
               <div className="flex items-baseline justify-between px-1">
@@ -401,7 +265,7 @@ function AchievementsInner() {
               </div>
               <div className="flex flex-col gap-2">
                 {items.map((a) => (
-                  <Row key={a.id} badge={a} earned={earnedById.get(a.id)} />
+                  <Row key={a.id} badge={a} entries={entriesById.get(a.id) ?? []} />
                 ))}
               </div>
             </section>
@@ -418,7 +282,7 @@ function AchievementsInner() {
                 .map((id) => ACHIEVEMENTS.find((a) => a.id === id))
                 .filter((a): a is Achievement => !!a)
                 .map((a) => (
-                  <Row key={a.id} badge={a} earned={earnedById.get(a.id)} />
+                  <Row key={a.id} badge={a} entries={entriesById.get(a.id) ?? []} />
                 ))}
             </div>
           </section>

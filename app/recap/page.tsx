@@ -23,7 +23,9 @@ import {
   topDrinkLabel,
   voteStats,
 } from "@/lib/recap";
-import { earnedForUser, evaluateAchievements } from "@/lib/achievements";
+import { ACHIEVEMENTS, evaluateAchievements, type Achievement, type EarnedBadge } from "@/lib/achievements";
+import { useAllEarnedBadges } from "@/lib/achievements-tracker";
+import type { StoredBadge } from "@/lib/achievements-storage";
 import { useUser } from "@/lib/user-context";
 import { SkeletonCard } from "@/components/Skeleton";
 import { useTableData } from "@/lib/realtime-provider";
@@ -202,10 +204,16 @@ function RecapPageInner() {
 
   const phase: "live" | "final" = selectedDay === todayKey ? "live" : "final";
 
+  // Your badges for this night come from the persistence layer (so they
+  // survive re-evaluation flicker and the 5am rollover). Other users' badges
+  // for the same night are still computed live since their history isn't on
+  // this device.
+  const allEarned = useAllEarnedBadges();
   const myBadges = useMemo(
-    () => (user ? earnedForUser(achievementCtx, user.id, phase) : []),
-    [achievementCtx, user, phase],
+    () => (user ? allEarned.filter((b) => b.partyDay === selectedDay) : []),
+    [allEarned, user, selectedDay],
   );
+  const myBadgeGroups = useMemo(() => groupByBadgeId(myBadges), [myBadges]);
 
   const allBadges = useMemo(
     () => evaluateAchievements(achievementCtx, phase),
@@ -347,8 +355,11 @@ function RecapPageInner() {
       `🗳️ Voted: ${personal.votes.cast} cast / ${personal.votes.proposalsWon} won / ${personal.votes.proposalsLost} lost`,
     );
     lines.push(`🏆 Game wins: ${personal.wins}`);
-    if (myBadges.length > 0) {
-      const top = myBadges.slice(0, 3).map((b) => `${b.icon} ${b.title}`);
+    if (myBadgeGroups.length > 0) {
+      const top = myBadgeGroups.slice(0, 3).map((g) => {
+        const x = g.entries.length > 1 ? ` ×${g.entries.length}` : "";
+        return `${g.achievement.icon} ${g.achievement.title}${x}`;
+      });
       lines.push(`— ${top.join(" · ")}`);
     }
     return lines.join("\n");
@@ -400,15 +411,15 @@ function RecapPageInner() {
 
   const userById = new Map(users.map((u) => [u.id, u]));
   const myBadgesByTier = {
-    win: myBadges.filter((b) => b.tier === "win"),
-    fail: myBadges.filter((b) => b.tier === "fail"),
-    fun: myBadges.filter((b) => b.tier === "fun"),
+    win: myBadgeGroups.filter((g) => g.achievement.tier === "win"),
+    fail: myBadgeGroups.filter((g) => g.achievement.tier === "fail"),
+    fun: myBadgeGroups.filter((g) => g.achievement.tier === "fun"),
   };
-  const myBadgeKeys = new Set(myBadges.map((b) => b.key));
+  const myBadgeIds = new Set(myBadgeGroups.map((g) => g.achievement.id));
   const otherBadgesById = new Map<string, { badge: typeof allBadges[number]; users: UserRow[] }>();
   for (const b of allBadges) {
     if (b.userId === user?.id) continue;
-    if (myBadgeKeys.has(b.key)) continue;
+    if (myBadgeIds.has(b.id)) continue;
     const u = userById.get(b.userId);
     if (!u) continue;
     const entry = otherBadgesById.get(b.id);
@@ -506,12 +517,12 @@ function RecapPageInner() {
             </p>
           ) : (
             <p className="text-xs text-muted mb-3">
-              {myBadges.length === 0
+              {myBadgeGroups.length === 0
                 ? "No badges earned this night."
-                : `${myBadges.length} badge${myBadges.length === 1 ? "" : "s"} earned.`}
+                : `${myBadgeGroups.length} badge${myBadgeGroups.length === 1 ? "" : "s"} earned.`}
             </p>
           )}
-          {myBadges.length === 0 ? (
+          {myBadgeGroups.length === 0 ? (
             <p className="text-sm text-muted">
               Quiet night so far — get amongst it.
             </p>
@@ -526,8 +537,12 @@ function RecapPageInner() {
                     <div className="text-xs uppercase tracking-wide text-muted">
                       {label}
                     </div>
-                    {list.map((b) => (
-                      <AchievementBadge key={b.key} badge={b} />
+                    {list.map((g) => (
+                      <AchievementBadge
+                        key={g.achievement.id}
+                        badge={storedToEarned(g.achievement, g.entries, user?.id ?? "")}
+                        count={g.entries.length}
+                      />
                     ))}
                   </div>
                 );
@@ -690,6 +705,35 @@ function RecapPageInner() {
       <DisclaimerFooter />
     </main>
   );
+}
+
+type BadgeGroup = { achievement: Achievement; entries: StoredBadge[] };
+
+const ACHIEVEMENT_BY_ID = new Map<string, Achievement>(
+  ACHIEVEMENTS.map((a) => [a.id, a]),
+);
+
+function groupByBadgeId(entries: StoredBadge[]): BadgeGroup[] {
+  const groups = new Map<string, BadgeGroup>();
+  for (const e of entries) {
+    const achievement = ACHIEVEMENT_BY_ID.get(e.id);
+    if (!achievement) continue;
+    const g = groups.get(e.id);
+    if (g) g.entries.push(e);
+    else groups.set(e.id, { achievement, entries: [e] });
+  }
+  return [...groups.values()];
+}
+
+function storedToEarned(achievement: Achievement, entries: StoredBadge[], userId: string): EarnedBadge {
+  const latest = entries.reduce((a, b) => (a.earnedAtMs >= b.earnedAtMs ? a : b));
+  return {
+    ...achievement,
+    userId,
+    key: latest.dedupKey,
+    detail: latest.detail,
+    earnedAtMs: latest.earnedAtMs,
+  };
 }
 
 function StatRow({ label, value, sub }: { label: string; value: string; sub?: string }) {
