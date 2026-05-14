@@ -10,6 +10,7 @@ import Avatar from "@/components/Avatar";
 import BigButton from "@/components/BigButton";
 import DisclaimerFooter from "@/components/DisclaimerFooter";
 import AchievementBadge from "@/components/AchievementBadge";
+import RecapReel from "@/components/RecapReel";
 import { supabase } from "@/lib/supabase/browser";
 import { peakBAC, formatBAC } from "@/lib/bac";
 import {
@@ -85,6 +86,7 @@ function RecapPageInner() {
   const { data: appOpens } = useTableData<AppOpenRow>("app_opens");
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const [reelOpen, setReelOpen] = useState(false);
 
   const todayKey = useMemo(() => partyDayKey(Date.now()), []);
   const selectedDay = searchParams.get("day") ?? todayKey;
@@ -700,6 +702,38 @@ function RecapPageInner() {
           )}
         </Card>
 
+        {reelOpen && (() => {
+          const drinksByUserId = new Map<string, number>();
+          for (const d of windowedDrinks) {
+            drinksByUserId.set(d.user_id, (drinksByUserId.get(d.user_id) ?? 0) + 1);
+          }
+          const topBadges = allBadges
+            .filter((b) => b.tier === "win")
+            .sort((a, b) => (b.earnedAtMs ?? 0) - (a.earnedAtMs ?? 0))
+            .slice(0, 8);
+          const topDrinkerEntry = [...drinksByUserId.entries()].sort((a, b) => b[1] - a[1])[0];
+          const topDrinker = topDrinkerEntry
+            ? { name: userById.get(topDrinkerEntry[0])?.name ?? "?", count: topDrinkerEntry[1] }
+            : null;
+          const fastest = superlatives.fastest && superlatives.fastest.user
+            ? { name: superlatives.fastest.user.name, pace: superlatives.fastest.value }
+            : null;
+          return (
+            <RecapReel
+              photos={windowedPhotos}
+              users={users}
+              drinksByUserId={drinksByUserId}
+              topBadges={topBadges}
+              stats={{
+                totalDrinks: windowedDrinks.length,
+                topDrinker,
+                fastestPace: fastest,
+              }}
+              onClose={() => setReelOpen(false)}
+            />
+          );
+        })()}
+
         {lightboxIdx !== null && windowedPhotos[lightboxIdx] && (
           <button
             type="button"
@@ -713,6 +747,12 @@ function RecapPageInner() {
               className="max-w-full max-h-full object-contain"
             />
           </button>
+        )}
+
+        {selectedDay !== todayKey && windowedPhotos.length >= 3 && (
+          <BigButton onClick={() => setReelOpen(true)} variant="secondary" className="py-5 text-lg">
+            ▶ Play recap reel
+          </BigButton>
         )}
 
         <BigButton onClick={onShare} className="py-5 text-lg">

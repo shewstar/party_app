@@ -297,13 +297,15 @@ export default function ItineraryPage() {
                         <button
                           key={emoji}
                           onClick={() => toggleReaction(evt.id, emoji)}
-                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-sm transition ${
+                          aria-label={`React with ${emoji}${count > 0 ? `, ${count} reaction${count === 1 ? "" : "s"}` : ""}`}
+                          aria-pressed={hasMine}
+                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-sm transition motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 ${
                             hasMine
                               ? "bg-accent text-white border-accent"
                               : "bg-surface text-ink border-line hover:bg-surface2"
                           }`}
                         >
-                          <span>{emoji}</span>
+                          <span aria-hidden>{emoji}</span>
                           {count > 0 && <span className={`tabular-nums text-xs font-medium ${hasMine ? "text-white/90" : "text-muted"}`}>{count}</span>}
                         </button>
                       );

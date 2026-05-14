@@ -60,7 +60,17 @@ export default function SpinPage() {
   const [spinning, setSpinning] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [winner, setWinner] = useState<UserRow | null>(null);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const initialisedRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setPrefersReducedMotion(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     if (initialisedRef.current || members.length === 0) return;
@@ -108,6 +118,7 @@ export default function SpinPage() {
     setSpinning(true);
     setRotation(rotation + FULL_SPINS * 360 + delta);
     const winnerUser = pool[winnerIdx];
+    const revealDelay = prefersReducedMotion ? 300 : SPIN_MS;
     setTimeout(async () => {
       setSpinning(false);
       setWinner(winnerUser);
@@ -122,7 +133,7 @@ export default function SpinPage() {
         return;
       }
       await supabase().from("spins").insert(payload);
-    }, SPIN_MS + 50);
+    }, revealDelay + 50);
   }
 
   if (loading || !user) {
@@ -203,9 +214,10 @@ export default function SpinPage() {
               <g
                 style={{
                   transform: `rotate(${rotation}deg)`,
-                  transition: spinning
-                    ? `transform ${SPIN_MS}ms cubic-bezier(0.18, 0.9, 0.25, 1)`
-                    : "none",
+                  transition:
+                    spinning && !prefersReducedMotion
+                      ? `transform ${SPIN_MS}ms cubic-bezier(0.18, 0.9, 0.25, 1)`
+                      : "none",
                   transformOrigin: "0 0",
                 }}
               >

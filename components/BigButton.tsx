@@ -30,8 +30,10 @@ export default function BigButton({
   type = "button",
 }: Props) {
   const cls = clsx(
-    "w-full rounded-card px-6 py-5 text-lg font-semibold transition",
+    "w-full rounded-card px-6 py-5 text-lg font-semibold transition min-h-12",
     "flex items-center justify-center gap-3",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
+    "motion-reduce:transition-none",
     disabled && "opacity-50 cursor-not-allowed",
     styles[variant],
     className,
