@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import TopBar from "@/components/TopBar";
 import Avatar from "@/components/Avatar";
+import Chip from "@/components/Chip";
 import { useUser } from "@/lib/user-context";
 import { useTableData, useRealtimeReady } from "@/lib/realtime-provider";
 import { SkeletonCard } from "@/components/Skeleton";
@@ -21,6 +22,7 @@ import type {
 export default function TimelinePage() {
   const { user, loading } = useUser();
   const ready = useRealtimeReady();
+  const [mode, setMode] = useState<"all" | "mine">("all");
   const { data: allUsers } = useTableData<UserRow>("users");
   const { data: allDrinks } = useTableData<DrinkRow>("drink_entries");
   const { data: allVotes } = useTableData<VoteTallyRow>("v_vote_tally");
@@ -60,6 +62,11 @@ export default function TimelinePage() {
     ],
   );
 
+  const visibleEvents = useMemo(
+    () => (mode === "mine" && user ? events.filter((ev) => ev.userId === user.id) : events),
+    [events, mode, user],
+  );
+
   if (loading || !user || !ready) {
     return (
       <main className="flex-1 flex flex-col">
@@ -76,15 +83,21 @@ export default function TimelinePage() {
   return (
     <main className="flex-1 flex flex-col">
       <TopBar title="Timeline" />
+      <div className="px-5 pt-3 pb-1 flex gap-2">
+        <Chip active={mode === "all"} onClick={() => setMode("all")}>Everyone</Chip>
+        <Chip active={mode === "mine"} onClick={() => setMode("mine")}>Just me</Chip>
+      </div>
       <div className="px-5 pb-4 flex flex-col gap-3">
-        {events.length === 0 && (
+        {visibleEvents.length === 0 && (
           <p className="text-sm text-muted text-center py-8">
-            Nothing has happened yet. Get the party started.
+            {mode === "mine"
+              ? "Nothing logged for you yet."
+              : "Nothing has happened yet. Get the party started."}
           </p>
         )}
-        {events.map((ev, i) => {
+        {visibleEvents.map((ev, i) => {
           const showHeader =
-            i === 0 || !sameHourBucket(events[i - 1].ts, ev.ts);
+            i === 0 || !sameHourBucket(visibleEvents[i - 1].ts, ev.ts);
           const u = ev.userId ? userById.get(ev.userId) : null;
           return (
             <div key={ev.key}>
