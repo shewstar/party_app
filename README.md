@@ -73,7 +73,18 @@ Triggers: new vote proposal, vote passes majority, itinerary event added, buck h
 4. Deploy. The buck-dry check runs hourly via [.github/workflows/buck-dry-check.yml](.github/workflows/buck-dry-check.yml) — in the repo's GitHub **Settings → Secrets and variables → Actions**, add `CRON_SECRET` (matching the value in your Vercel env) and `APP_URL` (e.g. `https://your-app.vercel.app`).
 5. iOS users must Add to Home Screen before push works — the banner detects iOS Safari and shows the install hint automatically.
 
+## Access gate
+
+A shared passphrase keeps randoms out. On first visit the device is redirected to `/gate`, you type the passphrase, and a signed httpOnly cookie remembers the device for 90 days.
+
+Set two env vars in `.env.local` and in Vercel (Production + Preview):
+
+- `PARTY_PASSWORD` — the passphrase you tell guests.
+- `PARTY_GATE_SECRET` — HMAC secret for the cookie. Generate via `openssl rand -hex 32`.
+
+This is intentionally light security stacked on top of the permissive RLS below — enough to keep URL-stumblers out, not enough to protect anything sensitive.
+
 ## Notes
 
-- Permissive RLS — this is a private bucks night, not a public service. Anyone with the URL + a connection can write. Don't deploy it publicly.
+- Permissive RLS — this is a private bucks night, not a public service. Anyone past the gate (or with the Supabase anon key) can write. Don't deploy it publicly.
 - Realtime channels are per-page; optimistic UI is on vote toggles and drink logs.
