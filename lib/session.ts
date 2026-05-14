@@ -31,3 +31,8 @@ export function getUserId(): string | null {
   return window.localStorage.getItem(USER_ID_KEY);
 }
 
+export function setUserId(id: string): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(USER_ID_KEY, id);
+}
+

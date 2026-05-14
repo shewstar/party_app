@@ -7,7 +7,8 @@ import BigButton from "@/components/BigButton";
 import Avatar from "@/components/Avatar";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
-import type { UserRow } from "@/lib/supabase/types";
+import { useTableData } from "@/lib/realtime-provider";
+import type { AppSettingsRow, UserRow } from "@/lib/supabase/types";
 
 const HIDDEN_TAPS = 5;
 
@@ -34,6 +35,12 @@ export default function SettingsPage() {
 
   // Crew
   const [crew, setCrew] = useState<UserRow[]>([]);
+
+  // Party-wide roster lock — when on, new users can't be created via
+  // /api/onboarding. Permissive RLS, so anyone with admin UI can toggle it.
+  const { data: settingsData } = useTableData<AppSettingsRow>("app_settings");
+  const rosterLocked = settingsData[0]?.roster_locked ?? false;
+  const [togglingRoster, setTogglingRoster] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -132,6 +139,22 @@ export default function SettingsPage() {
     if (error) { setMsg(error.message); return; }
     await loadCrew();
     if (targetId === user.id) await refresh();
+  }
+
+  async function toggleRoster() {
+    setTogglingRoster(true);
+    setMsg(null);
+    const next = !rosterLocked;
+    const { error } = await supabase()
+      .from("app_settings")
+      .update({ roster_locked: next, updated_at: new Date().toISOString() })
+      .eq("id", 1);
+    setTogglingRoster(false);
+    if (error) {
+      setMsg(error.message);
+      return;
+    }
+    setMsg(next ? "Roster locked — no new bucks." : "Roster unlocked.");
   }
 
   async function toggleEditor() {
@@ -260,6 +283,33 @@ export default function SettingsPage() {
                   <span
                     className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition ${
                       user.is_itinerary_editor ? "left-5" : "left-0.5"
+                    }`}
+                  />
+                </button>
+              </div>
+            </Card>
+
+            <Card>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-semibold text-sm">Lock the roster</div>
+                  <div className="text-xs text-muted">
+                    {rosterLocked
+                      ? "No new bucks can join from this point."
+                      : "Anyone past the gate can still onboard."}
+                  </div>
+                </div>
+                <button
+                  onClick={toggleRoster}
+                  disabled={togglingRoster}
+                  aria-label={rosterLocked ? "Unlock roster" : "Lock roster"}
+                  className={`relative w-11 h-6 rounded-full transition ${
+                    rosterLocked ? "bg-danger" : "bg-muted"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition ${
+                      rosterLocked ? "left-5" : "left-0.5"
                     }`}
                   />
                 </button>

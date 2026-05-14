@@ -154,3 +154,9 @@ export type AppOpenRow = {
   opened_at: string;
 };
 
+export type AppSettingsRow = {
+  id: number;
+  roster_locked: boolean;
+  updated_at: string;
+};
+
