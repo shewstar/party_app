@@ -24,7 +24,7 @@ export default function TopBar({
       {back && (
         <button
           onClick={() => router.back()}
-          className="rounded-full border border-line bg-surface w-9 h-9 flex items-center justify-center text-lg"
+          className="rounded-full border border-line bg-surface w-12 h-12 flex items-center justify-center text-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
           aria-label="Back"
         >
           ←

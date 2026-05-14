@@ -20,6 +20,7 @@ import { FINSKA, shuffle } from "@/lib/finska";
 import { CORNHOLE } from "@/lib/cornhole";
 import { getShuffledColors } from "@/lib/team-colors";
 import clsx from "@/components/clsx";
+import { burstPB } from "@/lib/confetti";
 
 export default function GameDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -66,6 +67,34 @@ export default function GameDetailPage() {
       if (resortTimer.current) clearTimeout(resortTimer.current);
     };
   }, []);
+
+  // Fire confetti when the current user sets a personal best in this game —
+  // i.e. their total in this game crosses their previous all-time-best total
+  // across every game they've played. Seed the ref on first render so we
+  // don't celebrate already-known totals.
+  const pbRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    const allTotals = allTotalsRaw as GameTotalsRow[];
+    const myBest = allTotals
+      .filter((t) => t.user_id === user.id)
+      .reduce((max, t) => Math.max(max, Number(t.total_score)), 0);
+    if (pbRef.current === null) {
+      pbRef.current = myBest;
+      return;
+    }
+    // Only celebrate a meaningful PB (>= 5 points) to avoid firing on first-point
+    // games where any score is technically the new best.
+    if (myBest > pbRef.current && myBest >= 5) {
+      const currentInThisGame = allTotals.find(
+        (t) => t.user_id === user.id && t.game_id === id,
+      );
+      if (currentInThisGame && Number(currentInThisGame.total_score) === myBest) {
+        burstPB();
+      }
+    }
+    pbRef.current = Math.max(pbRef.current, myBest);
+  }, [allTotalsRaw, user, id]);
 
   async function bump(userId: string, delta: number) {
     if (!game) return;

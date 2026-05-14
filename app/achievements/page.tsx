@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import TopBar from "@/components/TopBar";
 import Card from "@/components/Card";
 import clsx from "@/components/clsx";
+import BadgeDetailSheet from "@/components/BadgeDetailSheet";
 import {
   ACHIEVEMENTS,
   type Achievement,
@@ -139,9 +140,11 @@ const tierLabel: Record<Achievement["tier"], string> = {
 function Row({
   badge,
   entries,
+  onOpen,
 }: {
   badge: Achievement;
   entries: StoredBadge[];
+  onOpen: () => void;
 }) {
   const got = entries.length > 0;
   // Latest is the most recent earning across all instances/nights.
@@ -150,9 +153,12 @@ function Row({
     : undefined;
   const count = entries.length;
   return (
-    <div
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`${badge.title} — ${got ? `earned ${count} time${count === 1 ? "" : "s"}` : "locked"}. Show details.`}
       className={clsx(
-        "flex items-center gap-3 rounded-card border shadow-card px-3 py-2",
+        "w-full text-left flex items-center gap-3 rounded-card border shadow-card px-3 py-2 transition motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 hover:brightness-[0.98] active:brightness-95",
         got ? tierBorder[badge.tier] : "border-line bg-surface opacity-55",
       )}
     >
@@ -193,13 +199,14 @@ function Row({
       >
         {got ? tierLabel[badge.tier] : "Locked"}
       </span>
-    </div>
+    </button>
   );
 }
 
 export default function AchievementsPage() {
   const { user, loading } = useUser();
   const allEarned = useAllEarnedBadges();
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const entriesById = useMemo(() => {
     const map = new Map<string, StoredBadge[]>();
@@ -265,12 +272,24 @@ export default function AchievementsPage() {
               </div>
               <div className="flex flex-col gap-2">
                 {items.map((a) => (
-                  <Row key={a.id} badge={a} entries={entriesById.get(a.id) ?? []} />
+                  <Row key={a.id} badge={a} entries={entriesById.get(a.id) ?? []} onOpen={() => setOpenId(a.id)} />
                 ))}
               </div>
             </section>
           );
         })}
+
+        {openId && (() => {
+          const a = ACHIEVEMENTS.find((x) => x.id === openId);
+          if (!a) return null;
+          return (
+            <BadgeDetailSheet
+              badge={a}
+              entries={entriesById.get(a.id) ?? []}
+              onClose={() => setOpenId(null)}
+            />
+          );
+        })()}
 
         {unknownIds.length > 0 && (
           <section className="flex flex-col gap-2">
@@ -282,7 +301,7 @@ export default function AchievementsPage() {
                 .map((id) => ACHIEVEMENTS.find((a) => a.id === id))
                 .filter((a): a is Achievement => !!a)
                 .map((a) => (
-                  <Row key={a.id} badge={a} entries={entriesById.get(a.id) ?? []} />
+                  <Row key={a.id} badge={a} entries={entriesById.get(a.id) ?? []} onOpen={() => setOpenId(a.id)} />
                 ))}
             </div>
           </section>

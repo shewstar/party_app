@@ -8,8 +8,9 @@ import { useUser } from "@/lib/user-context";
 import { useHaptic } from "@/lib/haptics";
 import { SkeletonCard } from "@/components/Skeleton";
 import { useTableData } from "@/lib/realtime-provider";
-import type { VoteResponseRow, VoteTallyRow } from "@/lib/supabase/types";
+import type { VoteItemRow, VoteResponseRow, VoteTallyRow } from "@/lib/supabase/types";
 import clsx from "@/components/clsx";
+import { burstVote } from "@/lib/confetti";
 
 const VoteCard = memo(function VoteCard({
   item, myVote, onVote,
@@ -68,6 +69,7 @@ export default function VotePage() {
   const haptic = useHaptic();
   const { data: tallyRaw } = useTableData<VoteTallyRow>("v_vote_tally");
   const { data: rawResponses } = useTableData<VoteResponseRow>("vote_responses");
+  const { data: voteItemsRaw } = useTableData<VoteItemRow>("vote_items");
   const [items, setItems] = useState<VoteTallyRow[]>([]);
   const [myVotes, setMyVotes] = useState<Record<string, 1 | -1>>({});
   const myVotesRef = useRef(myVotes);
@@ -99,6 +101,25 @@ export default function VotePage() {
     }
     setMyVotes(map);
   }, [responses, user]);
+
+  // Fire confetti when a vote transitions from unpassed to passed. We seed the
+  // ref with currently-passed items on first render so we don't celebrate
+  // already-known wins on page mount.
+  const seenPassedRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (seenPassedRef.current === null) {
+      seenPassedRef.current = new Set(
+        voteItemsRaw.filter((v) => v.passed_at !== null).map((v) => v.id),
+      );
+      return;
+    }
+    for (const v of voteItemsRaw) {
+      if (v.passed_at && !seenPassedRef.current.has(v.id)) {
+        seenPassedRef.current.add(v.id);
+        burstVote();
+      }
+    }
+  }, [voteItemsRaw]);
 
   async function propose(e: React.FormEvent) {
     e.preventDefault();

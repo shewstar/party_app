@@ -21,8 +21,9 @@ export default function Tile({
     <Link
       href={href}
       className={clsx(
-        "relative rounded-card border border-line bg-surface px-4 py-4 flex flex-col items-start gap-0.5",
-        "shadow-card hover:bg-surface2 transition",
+        "relative rounded-card border border-line bg-surface px-4 py-4 flex flex-col items-start gap-0.5 min-h-12",
+        "shadow-card hover:bg-surface2 transition motion-reduce:transition-none",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2",
         className,
       )}
     >
