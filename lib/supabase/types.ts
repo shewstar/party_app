@@ -31,6 +31,9 @@ export type VoteItemRow = {
   text: string;
   created_at: string;
   passed_at: string | null;
+  rejected_at: string | null;
+  repeals_vote_item_id: string | null;
+  repealed_at: string | null;
 };
 
 export type PushSubscriptionRow = {
