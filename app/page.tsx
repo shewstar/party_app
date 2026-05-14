@@ -148,7 +148,9 @@ export default function HomePage() {
 
   const buckDrinks = useMemo(
     () => buckUser
-      ? (allDrinks as DrinkRow[]).filter((d) => d.user_id === buckUser.id)
+      ? (allDrinks as DrinkRow[])
+          .filter((d) => d.user_id === buckUser.id)
+          .sort((a, b) => new Date(b.logged_at).getTime() - new Date(a.logged_at).getTime())
       : [],
     [allDrinks, buckUser],
   );
