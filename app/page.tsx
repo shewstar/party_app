@@ -25,6 +25,7 @@ import type {
   ItineraryEventRow,
   SpinRow,
   UserRow,
+  VoteItemRow,
   VoteTallyRow,
 } from "@/lib/supabase/types";
 
@@ -72,7 +73,7 @@ export default function HomePage() {
   const { data: allDrinks } = useTableData<DrinkRow>("drink_entries");
   const { data: leaderboard } = useTableData<DrinksLeaderboardRow>("v_drinks_leaderboard");
   const { data: tally } = useTableData<VoteTallyRow>("v_vote_tally");
-  const { data: allVoteItems } = useTableData<{ id: string }>("vote_items");
+  const { data: allVoteItems } = useTableData<VoteItemRow>("vote_items");
   const { data: allVoteResponses } = useTableData<{ vote_item_id: string; user_id: string }>("vote_responses");
   const { data: allPhotos } = useTableData<{ id: string; user_id: string; party_day: string }>("camera_photos");
   const { data: allUsers } = useTableData<UserRow>("users");
@@ -130,7 +131,9 @@ export default function HomePage() {
         .filter((r) => r.user_id === user?.id)
         .map((r) => r.vote_item_id),
     );
-    return (allVoteItems as { id: string }[]).filter((v) => !voted.has(v.id)).length;
+    return (allVoteItems as VoteItemRow[]).filter(
+      (v) => !voted.has(v.id) && !v.passed_at && !v.rejected_at,
+    ).length;
   }, [allVoteItems, allVoteResponses, user]);
 
   const cameraUsed = useMemo(

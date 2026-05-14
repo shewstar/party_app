@@ -125,7 +125,7 @@ describe("evaluateAchievements — drinks", () => {
     const ctx: AchievementCtx = {
       ...emptyCtx([u1, u2], drinks),
       voteItems: [
-        { id: "v1", proposer_id: "u2", text: "Round?", created_at: new Date(T0).toISOString(), passed_at: null },
+        { id: "v1", proposer_id: "u2", text: "Round?", created_at: new Date(T0).toISOString(), passed_at: null, rejected_at: null, repeals_vote_item_id: null, repealed_at: null },
       ],
       voteResponses: [
         { vote_item_id: "v1", user_id: "u1", value: 1, updated_at: new Date(T0).toISOString() },
@@ -195,6 +195,9 @@ describe("evaluateAchievements — votes", () => {
         text: "Shots for everyone",
         created_at: new Date(T0).toISOString(),
         passed_at: null,
+        rejected_at: null,
+        repeals_vote_item_id: null,
+        repealed_at: null,
       },
     ];
     const voteResponses: VoteResponseRow[] = [
