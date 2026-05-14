@@ -11,16 +11,14 @@ export function installActivityTracker(): void {
   if (installed || typeof window === "undefined") return;
   installed = true;
 
+  // Only flash on writes — reads are polled by hot effects (e.g. the
+  // achievements tracker re-reads on every realtime data change), which
+  // would keep the indicator pinned on indefinitely.
   const proto = Storage.prototype;
-  const origGet = proto.getItem;
   const origSet = proto.setItem;
   const origRemove = proto.removeItem;
   const isOurKey = (k: string) => /^v\d+:bucks:/.test(k);
 
-  proto.getItem = function (k: string) {
-    if (isOurKey(k)) notifyActivity("ls");
-    return origGet.call(this, k);
-  };
   proto.setItem = function (k: string, v: string) {
     if (isOurKey(k)) notifyActivity("ls");
     return origSet.call(this, k, v);
