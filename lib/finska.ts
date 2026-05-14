@@ -82,6 +82,9 @@ export function computeFinskaState(
 
   for (const t of sorted) {
     if (winnerId) break;
+    // Negative rows are ledger compensations written alongside a busting
+    // throw to keep v_game_totals in sync with bust resets — not real throws.
+    if (t.score < 0) continue;
     const uid = t.user_id;
     if (eliminated.has(uid)) continue;
     if (!(uid in totals)) {

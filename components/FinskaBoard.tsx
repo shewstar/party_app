@@ -76,15 +76,26 @@ export default function FinskaBoard({ game, finished, onAutoFinish }: Props) {
     if (!state.currentThrowerId || finished) return;
     setSubmitting(true);
     haptic.medium();
-    const payload = {
-      game_id: game.id,
-      user_id: state.currentThrowerId,
-      score,
-    };
+    const uid = state.currentThrowerId;
+
+    // If this throw busts, also persist a compensating negative row so
+    // SUM(game_scores) reflects the bust reset. Without this, v_game_totals
+    // (and the games-menu winner picker) would still see the pre-bust total.
+    const prevTotal = state.totals[uid] ?? 0;
+    const willBust = score > 0 && prevTotal + score > FINSKA.winScore;
+    const compensation = willBust ? FINSKA.bustResetTo - (prevTotal + score) : 0;
+
+    const throwPayload = { game_id: game.id, user_id: uid, score };
+    const compPayload = compensation !== 0
+      ? { game_id: game.id, user_id: uid, score: compensation }
+      : null;
+
     if (!online) {
-      enqueue("game_scores", payload);
+      enqueue("game_scores", throwPayload);
+      if (compPayload) enqueue("game_scores", compPayload);
     } else {
-      await supabase().from("game_scores").insert(payload);
+      const rows = compPayload ? [throwPayload, compPayload] : [throwPayload];
+      await supabase().from("game_scores").insert(rows);
       await refreshTable("game_scores");
     }
     setSelected(new Set());
