@@ -21,6 +21,7 @@ import type {
   UserRow,
 } from "@/lib/supabase/types";
 import clsx from "@/components/clsx";
+import { getShuffledColors } from "@/lib/team-colors";
 
 type Props = {
   game: GameRow;
@@ -50,7 +51,7 @@ export default function FinskaBoard({ game, finished, onAutoFinish }: Props) {
     return m;
   }, [allUsers]);
 
-  const state = useMemo(() => computeFinskaState(players, throws), [players, throws]);
+  const state = useMemo(() => computeFinskaState(players, throws, game.team_count), [players, throws, game.team_count]);
 
   // Auto-finish the game when Finska rules declare a winner.
   useEffect(() => {
@@ -103,8 +104,23 @@ export default function FinskaBoard({ game, finished, onAutoFinish }: Props) {
     await recordScore(0);
   }
 
+  async function assignTeam(userId: string, teamIndex: number | null) {
+    await supabase()
+      .from("game_players")
+      .update({ team_index: teamIndex })
+      .eq("game_id", game.id)
+      .eq("user_id", userId);
+    await refreshTable("game_players");
+  }
+
   const orderedPlayers = useMemo(() => {
     return [...players].sort((a, b) => {
+      const at = a.team_index;
+      const bt = b.team_index;
+      if (at != null && bt != null) {
+        if (at !== bt) return at - bt;
+      } else if (at != null) return -1;
+      else if (bt != null) return 1;
       const ao = a.throw_order;
       const bo = b.throw_order;
       if (ao == null && bo == null) return 0;
@@ -113,6 +129,24 @@ export default function FinskaBoard({ game, finished, onAutoFinish }: Props) {
       return ao - bo;
     });
   }, [players]);
+
+  const teamByUserId = useMemo(() => {
+    const m = new Map<string, number | null>();
+    for (const p of players) m.set(p.user_id, p.team_index);
+    return m;
+  }, [players]);
+
+  const hasTeams = game.team_count != null && game.team_count > 0;
+
+  const shuffledColors = useMemo(
+    () => getShuffledColors(game.id),
+    [game.id],
+  );
+
+  function getTc(index: number | null | undefined) {
+    if (index == null || shuffledColors.length === 0) return null;
+    return shuffledColors[index % shuffledColors.length];
+  }
 
   const currentThrower = state.currentThrowerId
     ? usersById.get(state.currentThrowerId)
@@ -147,7 +181,11 @@ export default function FinskaBoard({ game, finished, onAutoFinish }: Props) {
             />
             <div className="flex-1">
               <div className="text-xs text-muted">Up next</div>
-              <div className="font-semibold">{currentThrower.name}'s throw</div>
+              <div className="font-semibold">
+                {hasTeams && teamByUserId.get(currentThrower.id) != null
+                  ? `${getTc(teamByUserId.get(currentThrower.id))?.name} Team's throw`
+                  : `${currentThrower.name}'s throw`}
+              </div>
             </div>
             <div className="text-right">
               <div className="text-xs text-muted">Score</div>
@@ -220,7 +258,7 @@ export default function FinskaBoard({ game, finished, onAutoFinish }: Props) {
       {/* Player list */}
       <Card padding="p-2">
         <ul className="flex flex-col gap-1">
-          {orderedPlayers.map((p) => {
+          {orderedPlayers.map((p, i) => {
             const u = usersById.get(p.user_id);
             if (!u) return null;
             const total = state.totals[p.user_id] ?? 0;
@@ -228,38 +266,82 @@ export default function FinskaBoard({ game, finished, onAutoFinish }: Props) {
             const isElim = state.eliminated.has(p.user_id);
             const isWinner = state.winnerId === p.user_id;
             const isCurrent = state.currentThrowerId === p.user_id;
+            const ti = hasTeams ? teamByUserId.get(p.user_id) : undefined;
+            const prevPlayer = i > 0 ? orderedPlayers[i - 1] : null;
+            const prevTi = prevPlayer && hasTeams ? teamByUserId.get(prevPlayer.user_id) : undefined;
+            const isNewTeam = ti != null && ti !== prevTi;
+            const tc = getTc(ti);
+
             return (
-              <li
-                key={p.user_id}
-                className={clsx(
-                  "flex items-center gap-3 rounded-card px-3 py-3",
-                  isCurrent && "ring-2 ring-accent bg-accentSoft/40",
-                  isElim && "opacity-50",
-                )}
-              >
-                <Avatar name={u.name} url={u.avatar_url} size={36} isBuck={u.is_buck} />
-                <div className="flex-1 min-w-0">
-                  <div
-                    className={clsx(
-                      "font-medium truncate",
-                      isElim && "line-through",
-                    )}
-                  >
-                    {isWinner && "🏆 "}
-                    {u.name}
+              <li key={p.user_id}>
+                {isNewTeam && tc && (
+                  <div className="flex items-center gap-2 px-1 pt-2 pb-1">
+                    <span
+                      className="w-3 h-3 rounded-full inline-block"
+                      style={{ backgroundColor: tc.hex }}
+                    />
+                    <span
+                      className="text-xs font-semibold uppercase tracking-wide"
+                      style={{ color: tc.hex }}
+                    >
+                      {tc.name} Team
+                    </span>
+                    <span className="tabular-nums ml-auto font-semibold">
+                      {total}
+                    </span>
+                    <span className="text-xs text-muted">/ {FINSKA.winScore}</span>
                   </div>
-                  {miss > 0 && !isElim && (
-                    <div className="text-xs text-muted mt-0.5">
-                      Misses: {miss}/{FINSKA.missLimit}
+                )}
+                <div
+                  className={clsx(
+                    "flex items-center gap-3 rounded-card px-3 py-3",
+                    isCurrent && "ring-2 ring-accent bg-accentSoft/40",
+                    isElim && "opacity-50",
+                  )}
+                  style={tc ? { borderLeft: `4px solid ${tc.hex}` } : undefined}
+                >
+                  <Avatar name={u.name} url={u.avatar_url} size={36} isBuck={u.is_buck} />
+                  <div className="flex-1 min-w-0">
+                    <div
+                      className={clsx(
+                        "font-medium truncate",
+                        isElim && "line-through",
+                      )}
+                    >
+                      {isWinner && "🏆 "}
+                      {u.name}
+                    </div>
+                    {miss > 0 && !isElim && (
+                      <div className="text-xs text-muted mt-0.5">
+                        Misses: {miss}/{FINSKA.missLimit}
+                      </div>
+                    )}
+                    {isElim && (
+                      <div className="text-xs text-danger mt-0.5">Eliminated</div>
+                    )}
+                    {hasTeams && !finished && (
+                      <select
+                        value={ti ?? ""}
+                        onChange={(e) =>
+                          assignTeam(p.user_id, e.target.value ? Number(e.target.value) : null)
+                        }
+                        className="text-xs border border-line rounded-md px-1 py-0.5 bg-surface mt-1 max-w-[80px] truncate"
+                      >
+                        <option value="">—</option>
+                        {Array.from({ length: game.team_count! }, (_, idx) => (
+                          <option key={idx} value={idx}>
+                            {getTc(idx)?.name ?? `Team ${idx + 1}`}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  {!hasTeams && (
+                    <div className="flex items-baseline gap-1 tabular-nums pl-2">
+                      <span className="font-semibold text-2xl leading-none">{total}</span>
+                      <span className="text-xs text-muted">/ {FINSKA.winScore}</span>
                     </div>
                   )}
-                  {isElim && (
-                    <div className="text-xs text-danger mt-0.5">Eliminated</div>
-                  )}
-                </div>
-                <div className="flex items-baseline gap-1 tabular-nums pl-2">
-                  <span className="font-semibold text-2xl leading-none">{total}</span>
-                  <span className="text-xs text-muted">/ {FINSKA.winScore}</span>
                 </div>
               </li>
             );
@@ -278,7 +360,18 @@ export default function FinskaBoard({ game, finished, onAutoFinish }: Props) {
               .slice(-12)
               .reverse()
               .map((ev, i) => (
-                <li key={i}>{formatEvent(ev, usersById)}</li>
+                <li key={i}>{formatEvent(ev, (uid) => {
+                  const user = usersById.get(uid);
+                  if (!user) return "Player";
+                  if (hasTeams) {
+                    const ti = teamByUserId.get(uid);
+                    if (ti != null) {
+                      const tc = getTc(ti);
+                      if (tc) return `${tc.name} Team`;
+                    }
+                  }
+                  return user.name;
+                })}</li>
               ))}
           </ul>
         </Card>
@@ -289,9 +382,9 @@ export default function FinskaBoard({ game, finished, onAutoFinish }: Props) {
 
 function formatEvent(
   ev: FinskaThrowEvent,
-  usersById: Map<string, UserRow>,
+  formatName: (userId: string) => string,
 ): string {
-  const name = usersById.get(ev.userId)?.name ?? "Player";
+  const name = formatName(ev.userId);
   switch (ev.kind) {
     case "hit":
       return `${name} → ${ev.throwScore} (total ${ev.newTotal})`;

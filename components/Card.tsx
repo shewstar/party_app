@@ -5,10 +5,12 @@ export default function Card({
   children,
   className,
   padding = "p-5",
+  style,
 }: {
   children: ReactNode;
   className?: string;
   padding?: string;
+  style?: React.CSSProperties;
 }) {
   return (
     <section
@@ -17,6 +19,7 @@ export default function Card({
         padding,
         className,
       )}
+      style={style}
     >
       {children}
     </section>

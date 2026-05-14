@@ -12,6 +12,7 @@ import { SkeletonCard } from "@/components/Skeleton";
 import { useTableData } from "@/lib/realtime-provider";
 import type { GamePreset, GameRow, GameTotalsRow, UserRow } from "@/lib/supabase/types";
 import { FINSKA, shuffle } from "@/lib/finska";
+import { CORNHOLE } from "@/lib/cornhole";
 
 type GameSummary = GameRow & { totals: GameTotalsRow[] };
 
@@ -70,10 +71,21 @@ export default function GamesPage() {
   const [name, setName] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [preset, setPreset] = useState<GamePreset | null>(null);
+  const [isTeamGame, setIsTeamGame] = useState(false);
+  const [teamCount, setTeamCount] = useState(2);
 
   useEffect(() => {
     if (loading) return;
   }, [loading]);
+
+  useEffect(() => {
+    if (preset === CORNHOLE.id && picked.size > 2) {
+      setIsTeamGame(true);
+      setTeamCount(2);
+    } else if (preset === CORNHOLE.id) {
+      setIsTeamGame(false);
+    }
+  }, [preset, picked.size]);
 
   function togglePick(id: string) {
     setPicked((prev) => {
@@ -90,23 +102,27 @@ export default function GamesPage() {
     const s = supabase();
     const { data, error } = await s
       .from("games")
-      .insert({ name: name.trim(), preset })
+      .insert({ name: name.trim(), preset, team_count: isTeamGame ? teamCount : null })
       .select()
       .single();
     if (error || !data) {
       alert(error?.message ?? "Failed to create game");
       return;
     }
-    const order = preset === FINSKA.id ? shuffle(Array.from(picked)) : Array.from(picked);
+    const needsOrder = preset === FINSKA.id || preset === CORNHOLE.id;
+    const order = needsOrder ? shuffle(Array.from(picked)) : Array.from(picked);
     const rows = order.map((uid, i) => ({
       game_id: data.id,
       user_id: uid,
-      throw_order: preset === FINSKA.id ? i : null,
+      throw_order: needsOrder ? i : null,
+      team_index: isTeamGame ? i % teamCount : null,
     }));
     await s.from("game_players").insert(rows);
     setName("");
     setPicked(new Set());
     setPreset(null);
+    setIsTeamGame(false);
+    setTeamCount(2);
     setCreating(false);
   }
 
@@ -143,6 +159,9 @@ export default function GamesPage() {
                   <Chip active={preset === FINSKA.id} onClick={() => setPreset(FINSKA.id)}>
                     {FINSKA.label}
                   </Chip>
+                  <Chip active={preset === CORNHOLE.id} onClick={() => setPreset(CORNHOLE.id)}>
+                    {CORNHOLE.label}
+                  </Chip>
                 </div>
               </div>
               <label className="flex flex-col gap-1">
@@ -150,7 +169,11 @@ export default function GamesPage() {
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder={preset === FINSKA.id ? "Finska round 1…" : "Beer pong, darts, pool…"}
+                  placeholder={
+                    preset === FINSKA.id ? "Finska round 1…" :
+                    preset === CORNHOLE.id ? "Cornhole round 1…" :
+                    "Beer pong, darts, pool…"
+                  }
                   maxLength={40}
                   className="border border-line rounded-card px-3 py-2 bg-surface"
                 />
@@ -168,6 +191,34 @@ export default function GamesPage() {
                   )}
                 </div>
               </div>
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium">Team game</span>
+                {preset === CORNHOLE.id && picked.size > 2 ? (
+                  <span className="text-sm text-muted">2 teams (required for {picked.size} players)</span>
+                ) : (
+                  <Chip active={isTeamGame} onClick={() => setIsTeamGame(!isTeamGame)}>
+                    {isTeamGame ? `${teamCount} teams` : "Off"}
+                  </Chip>
+                )}
+                {isTeamGame && picked.size >= 2 && preset !== CORNHOLE.id && (
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={2}
+                      max={Math.max(2, picked.size)}
+                      value={teamCount}
+                      onChange={(e) => setTeamCount(Number(e.target.value))}
+                      className="flex-1 accent-accent"
+                    />
+                    <span className="text-sm text-muted tabular-nums w-6 text-right">
+                      {teamCount}
+                    </span>
+                  </div>
+                )}
+                {isTeamGame && picked.size < 2 && (
+                  <span className="text-xs text-muted">Pick at least 2 players for teams.</span>
+                )}
+              </div>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -176,6 +227,8 @@ export default function GamesPage() {
                     setName("");
                     setPicked(new Set());
                     setPreset(null);
+                    setIsTeamGame(false);
+                    setTeamCount(2);
                   }}
                   className="flex-1 rounded-card border border-line bg-surface py-2"
                 >

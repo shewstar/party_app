@@ -50,13 +50,14 @@ export type VoteResponseRow = {
   updated_at: string;
 };
 
-export type GamePreset = "finska";
+export type GamePreset = "finska" | "cornhole";
 
 export type GameRow = {
   id: string;
   name: string;
   finished: boolean;
   preset: GamePreset | null;
+  team_count: number | null;
   created_at: string;
 };
 
@@ -64,6 +65,7 @@ export type GamePlayerRow = {
   game_id: string;
   user_id: string;
   throw_order: number | null;
+  team_index: number | null;
 };
 
 export type GameScoreRow = {

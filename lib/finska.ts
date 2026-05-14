@@ -35,12 +35,13 @@ export type FinskaState = {
   events: FinskaThrowEvent[];
 };
 
-type PlayerInput = { user_id: string; throw_order: number | null };
+type PlayerInput = { user_id: string; throw_order: number | null; team_index: number | null };
 type ThrowInput = { user_id: string; score: number; recorded_at: string };
 
 export function computeFinskaState(
   players: PlayerInput[],
   throws: ThrowInput[],
+  teamCount: number | null,
 ): FinskaState {
   // Players in locked throw rotation. NULL throw_order sinks to the end and
   // keeps a stable arrival order — covers players added mid-game.
@@ -58,6 +59,17 @@ export function computeFinskaState(
   const eliminated = new Set<string>();
   const events: FinskaThrowEvent[] = [];
   let winnerId: string | null = null;
+
+  const useTeams = teamCount != null && teamCount >= 2;
+
+  // Build team lookup and team totals.
+  const teamByUserId = new Map<string, number | null>();
+  for (const p of ordered) teamByUserId.set(p.user_id, p.team_index);
+
+  const teamTotals: Record<number, number> = {};
+  if (useTeams) {
+    for (let i = 0; i < teamCount!; i++) teamTotals[i] = 0;
+  }
 
   for (const p of ordered) {
     totals[p.user_id] = 0;
@@ -88,16 +100,41 @@ export function computeFinskaState(
     }
 
     missStreak[uid] = 0;
-    const next = totals[uid] + t.score;
-    if (next > FINSKA.winScore) {
-      totals[uid] = FINSKA.bustResetTo;
-      events.push({ kind: "bust", userId: uid, throwScore: t.score, ts: t.recorded_at });
+    const ti = useTeams ? teamByUserId.get(uid) : undefined;
+
+    if (ti != null) {
+      // Team scoring: bust and win checks use the team total.
+      const teamTotal = (teamTotals[ti] ?? 0) + t.score;
+      if (teamTotal > FINSKA.winScore) {
+        teamTotals[ti] = FINSKA.bustResetTo;
+        for (const p of ordered) {
+          if (teamByUserId.get(p.user_id) === ti) totals[p.user_id] = FINSKA.bustResetTo;
+        }
+        events.push({ kind: "bust", userId: uid, throwScore: t.score, ts: t.recorded_at });
+      } else {
+        teamTotals[ti] = teamTotal;
+        for (const p of ordered) {
+          if (teamByUserId.get(p.user_id) === ti) totals[p.user_id] = teamTotal;
+        }
+        events.push({ kind: "hit", userId: uid, throwScore: t.score, newTotal: teamTotal, ts: t.recorded_at });
+        if (teamTotal === FINSKA.winScore) {
+          winnerId = uid;
+          events.push({ kind: "win", userId: uid, ts: t.recorded_at });
+        }
+      }
     } else {
-      totals[uid] = next;
-      events.push({ kind: "hit", userId: uid, throwScore: t.score, newTotal: next, ts: t.recorded_at });
-      if (next === FINSKA.winScore) {
-        winnerId = uid;
-        events.push({ kind: "win", userId: uid, ts: t.recorded_at });
+      // Individual scoring.
+      const next = totals[uid] + t.score;
+      if (next > FINSKA.winScore) {
+        totals[uid] = FINSKA.bustResetTo;
+        events.push({ kind: "bust", userId: uid, throwScore: t.score, ts: t.recorded_at });
+      } else {
+        totals[uid] = next;
+        events.push({ kind: "hit", userId: uid, throwScore: t.score, newTotal: next, ts: t.recorded_at });
+        if (next === FINSKA.winScore) {
+          winnerId = uid;
+          events.push({ kind: "win", userId: uid, ts: t.recorded_at });
+        }
       }
     }
   }
@@ -112,24 +149,72 @@ export function computeFinskaState(
     }
   }
 
-  // Current thrower: next active player in rotation after the most recent
-  // throw. Skips eliminated. Null if the game has a winner.
+  // Current thrower: if teams are in use, alternate by team; within a team
+  // pick the active player with the fewest throws. Otherwise walk individual
+  // rotation. Skips eliminated. Null if the game has a winner.
   let currentThrowerId: string | null = null;
   const active = ordered.filter((p) => !eliminated.has(p.user_id));
   if (!winnerId && active.length > 0) {
-    if (sorted.length === 0) {
-      currentThrowerId = active[0].user_id;
-    } else {
-      const lastUid = sorted[sorted.length - 1].user_id;
-      const lastIdx = ordered.findIndex((p) => p.user_id === lastUid);
-      // Walk the rotation from lastIdx+1 until we hit a non-eliminated player.
-      for (let step = 1; step <= ordered.length; step++) {
-        const candidate = ordered[(lastIdx + step) % ordered.length];
-        if (!eliminated.has(candidate.user_id)) {
-          currentThrowerId = candidate.user_id;
-          break;
+    if (!useTeams) {
+      if (sorted.length === 0) {
+        currentThrowerId = active[0].user_id;
+      } else {
+        const lastUid = sorted[sorted.length - 1].user_id;
+        const lastIdx = ordered.findIndex((p) => p.user_id === lastUid);
+        for (let step = 1; step <= ordered.length; step++) {
+          const candidate = ordered[(lastIdx + step) % ordered.length];
+          if (!eliminated.has(candidate.user_id)) {
+            currentThrowerId = candidate.user_id;
+            break;
+          }
         }
       }
+    } else {
+      // Team rotation. Build team order: assigned teams first (sorted by
+      // team_index), then each unassigned player individually.
+      const teamOrder: string[] = [];
+      const teamPlayers = new Map<string, string[]>();
+      for (const p of ordered) {
+        if (p.team_index != null) {
+          const key = `t:${p.team_index}`;
+          if (!teamPlayers.has(key)) {
+            teamPlayers.set(key, []);
+            teamOrder.push(key);
+          }
+          teamPlayers.get(key)!.push(p.user_id);
+        } else {
+          const key = `u:${p.user_id}`;
+          teamPlayers.set(key, [p.user_id]);
+          teamOrder.push(key);
+        }
+      }
+      // Count throws per player so we can pick the least-used within a team.
+      const perPlayerCounts: Record<string, number> = {};
+      for (const t of sorted) {
+        perPlayerCounts[t.user_id] = (perPlayerCounts[t.user_id] ?? 0) + 1;
+      }
+      // Determine which team goes next.
+      let nextTeamIdx = 0;
+      if (sorted.length > 0) {
+        const lastUid = sorted[sorted.length - 1].user_id;
+        const lastPlayer = ordered.find((p) => p.user_id === lastUid);
+        const lastKey = lastPlayer?.team_index != null ? `t:${lastPlayer.team_index}` : `u:${lastUid}`;
+        const idx = teamOrder.indexOf(lastKey);
+        if (idx !== -1) nextTeamIdx = (idx + 1) % teamOrder.length;
+      }
+      const nextTeamKey = teamOrder[nextTeamIdx];
+      const candidates = teamPlayers.get(nextTeamKey) ?? [];
+      let bestId: string | null = null;
+      let bestCount = Infinity;
+      for (const uid of candidates) {
+        if (eliminated.has(uid)) continue;
+        const c = perPlayerCounts[uid] ?? 0;
+        if (c < bestCount) {
+          bestCount = c;
+          bestId = uid;
+        }
+      }
+      currentThrowerId = bestId;
     }
   }
 
