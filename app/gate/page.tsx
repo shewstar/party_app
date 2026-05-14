@@ -1,5 +1,7 @@
 import Card from "@/components/Card";
 
+export const dynamic = "force-dynamic";
+
 type SearchParams = Promise<{ error?: string; next?: string }>;
 
 export default async function GatePage({
