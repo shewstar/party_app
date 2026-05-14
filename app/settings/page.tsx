@@ -7,7 +7,7 @@ import BigButton from "@/components/BigButton";
 import Avatar from "@/components/Avatar";
 import { supabase } from "@/lib/supabase/browser";
 import { useUser } from "@/lib/user-context";
-import { useTableData } from "@/lib/realtime-provider";
+import { useRefreshTable, useTableData } from "@/lib/realtime-provider";
 import type { AppSettingsRow, UserRow } from "@/lib/supabase/types";
 
 const HIDDEN_TAPS = 5;
@@ -41,6 +41,7 @@ export default function SettingsPage() {
   const { data: settingsData } = useTableData<AppSettingsRow>("app_settings");
   const rosterLocked = settingsData[0]?.roster_locked ?? false;
   const [togglingRoster, setTogglingRoster] = useState(false);
+  const refreshTable = useRefreshTable();
 
   useEffect(() => {
     if (!user) return;
@@ -149,11 +150,16 @@ export default function SettingsPage() {
       .from("app_settings")
       .update({ roster_locked: next, updated_at: new Date().toISOString() })
       .eq("id", 1);
-    setTogglingRoster(false);
     if (error) {
+      setTogglingRoster(false);
       setMsg(error.message);
       return;
     }
+    // The realtime postgres_changes subscription will push this back to
+    // every other device, but refetch here for instant feedback on this
+    // device — and as a fallback if the publication isn't yet configured.
+    await refreshTable("app_settings");
+    setTogglingRoster(false);
     setMsg(next ? "Roster locked — no new bucks." : "Roster unlocked.");
   }
 
