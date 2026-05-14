@@ -8,7 +8,7 @@
 // Process: edit the constant, commit, deploy. No notification, no manual
 // action. Use this between events / before a fresh party night.
 
-export const STORAGE_VERSION = 1;
+export const STORAGE_VERSION = 2;
 const PREFIX = "bucks";
 
 export function vkey(rawKey: string): string {
