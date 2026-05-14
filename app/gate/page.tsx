@@ -10,6 +10,7 @@ export default async function GatePage({
   const { error, next } = await searchParams;
   const hasError = error === "1";
   const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  const hint = process.env.PARTY_PASSWORD_HINT?.trim();
 
   return (
     <main className="flex-1 px-5 py-8 flex flex-col gap-6 justify-center">
@@ -30,6 +31,7 @@ export default async function GatePage({
               autoComplete="current-password"
               className="border border-line rounded-card px-4 py-3 text-lg bg-surface focus:outline-none focus:border-accent"
             />
+            {hint && <span className="text-xs text-muted">Hint: {hint}</span>}
           </label>
           <button
             type="submit"
