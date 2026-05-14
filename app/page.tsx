@@ -8,11 +8,11 @@ import Tile from "@/components/Tile";
 import Avatar from "@/components/Avatar";
 import BACBadge from "@/components/BACBadge";
 import DisclaimerFooter from "@/components/DisclaimerFooter";
+import StatusPills from "@/components/StatusPills";
 import { SkeletonAvatar, SkeletonCard, SkeletonLine, SkeletonTile } from "@/components/Skeleton";
 import { estimateBAC } from "@/lib/bac";
 import { useUser } from "@/lib/user-context";
 import { useTableData } from "@/lib/realtime-provider";
-import { useOnlineStatus } from "@/lib/offline-queue";
 import { partyDayKey } from "@/lib/recap";
 import { vkey } from "@/lib/storage";
 import { buildTimelineEvents, formatTimeAgo } from "@/lib/timeline-events";
@@ -68,7 +68,6 @@ function timeSince(iso: string | null): string {
 
 export default function HomePage() {
   const { user, loading } = useUser();
-  const { online } = useOnlineStatus();
 
   const { data: allDrinks } = useTableData<DrinkRow>("drink_entries");
   const { data: leaderboard } = useTableData<DrinksLeaderboardRow>("v_drinks_leaderboard");
@@ -212,10 +211,12 @@ export default function HomePage() {
             <div className="text-lg font-semibold">{user.name}</div>
           </div>
         </div>
-        <Link href="/settings" className="text-sm text-muted underline flex items-center gap-1.5">
-          Settings
-          <span className={`inline-block w-2 h-2 rounded-full ${online ? "bg-green-500" : "bg-amber-500"}`} aria-label={online ? "Online" : "Offline"} />
-        </Link>
+        <div className="flex items-center gap-3">
+          <StatusPills />
+          <Link href="/settings" className="text-sm text-muted underline">
+            Settings
+          </Link>
+        </div>
       </header>
 
       <Card>
