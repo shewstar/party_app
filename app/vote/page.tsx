@@ -258,7 +258,7 @@ export default function VotePage() {
   const [posting, setPosting] = useState(false);
 
   type SortKey = "newest" | "popular" | "controversial" | "decision";
-  type FilterKey = "all" | "active" | "passed" | "rejected" | "voted" | "unvoted" | "mine";
+  type FilterKey = "all" | "active" | "passed" | "rejected" | "unvoted";
   const [sort, setSort] = useState<SortKey>("newest");
   const [filter, setFilter] = useState<FilterKey>("active");
 
@@ -446,9 +446,7 @@ export default function VotePage() {
 
   const filtered = useMemo(() => {
     let list = items;
-    if (filter === "voted") list = list.filter((v) => myVotes[v.id] !== undefined);
-    else if (filter === "unvoted") list = list.filter((v) => myVotes[v.id] === undefined);
-    else if (filter === "mine") list = list.filter((v) => v.proposer_id === user?.id);
+    if (filter === "unvoted") list = list.filter((v) => myVotes[v.id] === undefined);
     else if (filter === "active") list = list.filter((v) => !passedById.get(v.id) && !rejectedById.get(v.id));
     else if (filter === "passed") list = list.filter((v) => passedById.get(v.id));
     else if (filter === "rejected") list = list.filter((v) => rejectedById.get(v.id));
@@ -540,9 +538,7 @@ export default function VotePage() {
                 ["active", "Active"],
                 ["passed", "Passed"],
                 ["rejected", "Rejected"],
-                ["voted", "Voted"],
                 ["unvoted", "Not voted"],
-                ["mine", "Mine"],
               ] as [FilterKey, string][]
             ).map(([k, label]) => (
               <button

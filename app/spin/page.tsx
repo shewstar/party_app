@@ -360,7 +360,7 @@ export default function SpinPage() {
               </g>
               <circle r={14} fill="#1f2937" stroke="#fff" strokeWidth={2} />
               <polygon
-                points={`0,${-R - 18} -14,${-R + 8} 14,${-R + 8}`}
+                points={`0,${-R + 8} -14,${-R - 18} 14,${-R - 18}`}
                 fill="#1f2937"
                 stroke="#fff"
                 strokeWidth={2}
