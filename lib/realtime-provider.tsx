@@ -26,6 +26,7 @@ type TableName =
   | "itinerary_events"
   | "itinerary_reactions"
   | "app_opens"
+  | "app_settings"
   | "v_drinks_leaderboard"
   | "v_vote_tally"
   | "v_game_totals";
@@ -49,6 +50,7 @@ const ALL_TABLES: TableName[] = [
   "itinerary_events",
   "itinerary_reactions",
   "app_opens",
+  "app_settings",
   "v_drinks_leaderboard",
   "v_vote_tally",
   "v_game_totals",

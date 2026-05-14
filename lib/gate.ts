@@ -1,5 +1,11 @@
 // Shared HMAC sign/verify for the party-pass cookie. Edge-compatible
 // (uses Web Crypto, not node:crypto) so middleware can call it too.
+//
+// Token format: `<payload>.<signature>` where payload is one of
+//   v1.<issuedAtSeconds>             — legacy, no identity binding
+//   v2.<issuedAtSeconds>.<userId>    — device claimed a user; onboarding
+//                                       refuses a second user from this cookie
+// UUIDs don't contain dots, so splitting payload by "." is unambiguous.
 
 const COOKIE_NAME = "party-pass";
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 90; // 90 days
@@ -38,9 +44,15 @@ function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
   return diff === 0;
 }
 
-// Token format: `<payload>.<signature>` where payload is `v1.<issuedAtSeconds>`.
-export async function signGateToken(secret: string): Promise<string> {
-  const payload = `v1.${Math.floor(Date.now() / 1000)}`;
+export type GateClaims = {
+  valid: boolean;
+  userId: string | null;
+  issuedAt: number | null;
+};
+
+export async function signGateToken(secret: string, userId?: string | null): Promise<string> {
+  const ts = Math.floor(Date.now() / 1000);
+  const payload = userId ? `v2.${ts}.${userId}` : `v1.${ts}`;
   const key = await hmacKey(secret);
   const sig = new Uint8Array(
     await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)),
@@ -48,24 +60,37 @@ export async function signGateToken(secret: string): Promise<string> {
   return `${payload}.${b64urlEncode(sig)}`;
 }
 
-export async function verifyGateToken(token: string | undefined, secret: string): Promise<boolean> {
-  if (!token) return false;
+export async function readGateClaims(token: string | undefined, secret: string): Promise<GateClaims> {
+  const empty: GateClaims = { valid: false, userId: null, issuedAt: null };
+  if (!token) return empty;
   const lastDot = token.lastIndexOf(".");
-  if (lastDot < 0) return false;
+  if (lastDot < 0) return empty;
   const payload = token.slice(0, lastDot);
   const sig = token.slice(lastDot + 1);
-  if (!payload.startsWith("v1.") || !sig) return false;
+  if (!sig) return empty;
   let sigBytes: Uint8Array;
   try {
     sigBytes = b64urlDecode(sig);
   } catch {
-    return false;
+    return empty;
   }
   const key = await hmacKey(secret);
   const expected = new Uint8Array(
     await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)),
   );
-  return timingSafeEqual(sigBytes, expected);
+  if (!timingSafeEqual(sigBytes, expected)) return empty;
+  const parts = payload.split(".");
+  if (parts[0] === "v1" && parts.length === 2) {
+    return { valid: true, userId: null, issuedAt: parseInt(parts[1], 10) || null };
+  }
+  if (parts[0] === "v2" && parts.length === 3) {
+    return { valid: true, userId: parts[2], issuedAt: parseInt(parts[1], 10) || null };
+  }
+  return empty;
+}
+
+export async function verifyGateToken(token: string | undefined, secret: string): Promise<boolean> {
+  return (await readGateClaims(token, secret)).valid;
 }
 
 // Constant-time string equality for the password check.

@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import BigButton from "@/components/BigButton";
 import Card from "@/components/Card";
-import { supabase } from "@/lib/supabase/browser";
-import { ensureUserId, useUser } from "@/lib/user-context";
+import { useUser } from "@/lib/user-context";
+import { setUserId } from "@/lib/session";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -23,17 +23,31 @@ export default function OnboardingPage() {
     if (!name.trim()) return;
     setSubmitting(true);
     setError(null);
-    const id = ensureUserId();
-    const { error: err } = await supabase()
-      .from("users")
-      .upsert({ id, name: name.trim() }, { onConflict: "id" });
-    if (err) {
-      setError(err.message);
+    try {
+      const res = await fetch("/api/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      const body = (await res.json().catch(() => null)) as
+        | { userId?: string; error?: string; message?: string }
+        | null;
+      if (!res.ok) {
+        if (res.status === 423) {
+          setError(body?.message ?? "The roster is locked.");
+        } else {
+          setError(body?.message ?? body?.error ?? "Couldn't join — please try again.");
+        }
+        setSubmitting(false);
+        return;
+      }
+      if (body?.userId) setUserId(body.userId);
+      await refresh();
+      router.replace("/");
+    } catch {
+      setError("Network error — try again.");
       setSubmitting(false);
-      return;
     }
-    await refresh();
-    router.replace("/");
   }
 
   return (
