@@ -4,6 +4,7 @@ import type {
   GameScoreRow,
   GameTotalsRow,
   ItineraryEventRow,
+  PissEntryRow,
   SpinRow,
   UserRow,
   VoteTallyRow,
@@ -26,6 +27,7 @@ export const CATEGORY_EMOJI: Record<string, string> = {
 type BuildInput = {
   users: UserRow[];
   drinks: DrinkRow[];
+  pisses: PissEntryRow[];
   votes: VoteTallyRow[];
   games: GameRow[];
   gameTotals: GameTotalsRow[];
@@ -48,6 +50,17 @@ export function buildTimelineEvents(input: BuildInput): TimelineEvent[] {
       text: `${u?.name ?? "Someone"} logged a ${d.label ?? d.category}`,
       ts: new Date(d.logged_at).getTime(),
       userId: d.user_id,
+    });
+  }
+
+  for (const p of input.pisses) {
+    const u = userById.get(p.user_id);
+    list.push({
+      key: `piss-${p.id}`,
+      icon: "🚽",
+      text: `${u?.name ?? "Someone"} took a piss`,
+      ts: new Date(p.logged_at).getTime(),
+      userId: p.user_id,
     });
   }
 

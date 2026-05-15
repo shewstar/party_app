@@ -40,6 +40,7 @@ import type {
   GameTotalsRow,
   ItineraryEventRow,
   ItineraryReactionRow,
+  PissEntryRow,
   SpinRow,
   UserRow,
   VoteItemRow,
@@ -72,6 +73,7 @@ function RecapPageInner() {
 
   const { data: users } = useTableData<UserRow>("users");
   const { data: drinks } = useTableData<DrinkRow>("drink_entries");
+  const { data: pisses } = useTableData<PissEntryRow>("piss_entries");
   const { data: games } = useTableData<GameRow>("games");
   const { data: gameTotals } = useTableData<GameTotalsRow>("v_game_totals");
   const { data: gamePlayers } = useTableData<GamePlayerRow>("game_players");
@@ -107,6 +109,10 @@ function RecapPageInner() {
   const windowedDrinks = useMemo(
     () => drinks.filter((d) => inWindow(d.logged_at)),
     [drinks, dayWindow.startMs, dayWindow.endMs],
+  );
+  const windowedPisses = useMemo(
+    () => pisses.filter((p) => inWindow(p.logged_at)),
+    [pisses, dayWindow.startMs, dayWindow.endMs],
   );
   const windowedVoteItems = useMemo(
     () => voteItems.filter((i) => inWindow(i.created_at)),
@@ -171,6 +177,7 @@ function RecapPageInner() {
     () => ({
       users,
       drinks: windowedDrinks,
+      pisses: windowedPisses,
       voteItems: windowedVoteItems,
       voteResponses: windowedVoteResponses,
       voteTally: windowedVoteTally,
@@ -189,6 +196,7 @@ function RecapPageInner() {
     [
       users,
       windowedDrinks,
+      windowedPisses,
       windowedVoteItems,
       windowedVoteResponses,
       windowedVoteTally,
@@ -245,6 +253,7 @@ function RecapPageInner() {
       user.id,
     );
     const wins = gameWinsByUser(windowedGameTotals).find((r) => r.user_id === user.id);
+    const myPissCount = windowedPisses.filter((p) => p.user_id === user.id).length;
     return {
       count: myDrinks.length,
       std: totalStd,
@@ -252,10 +261,12 @@ function RecapPageInner() {
       top,
       votes,
       wins: wins?.wins ?? 0,
+      pisses: myPissCount,
     };
   }, [
     user,
     myDrinks,
+    windowedPisses,
     windowedVoteResponses,
     windowedVoteItems,
     windowedVoteTally,
@@ -305,6 +316,12 @@ function RecapPageInner() {
     );
     const champion = wins[0];
 
+    const pissCountByUser = new Map<string, number>();
+    for (const p of windowedPisses) {
+      pissCountByUser.set(p.user_id, (pissCountByUser.get(p.user_id) ?? 0) + 1);
+    }
+    const topPisser = [...pissCountByUser.entries()].sort((a, b) => b[1] - a[1])[0];
+
     return {
       biggestDrinker:
         biggestDrinker && biggestDrinker[1] > 0
@@ -325,8 +342,12 @@ function RecapPageInner() {
         champion && champion.wins > 0
           ? { user: userById.get(champion.user_id), value: champion.wins }
           : null,
+      mostPisses:
+        topPisser && topPisser[1] > 0
+          ? { user: userById.get(topPisser[0]), value: topPisser[1] }
+          : null,
     };
-  }, [users, windowedDrinks, windowedVoteItems, windowedVoteTally, windowedGameTotals]);
+  }, [users, windowedDrinks, windowedPisses, windowedVoteItems, windowedVoteTally, windowedGameTotals]);
 
   const buckStats = useMemo(() => {
     const buck = users.find((u) => u.is_buck);
@@ -359,6 +380,7 @@ function RecapPageInner() {
       `🗳️ Voted: ${personal.votes.cast} cast / ${personal.votes.proposalsWon} won / ${personal.votes.proposalsLost} lost`,
     );
     lines.push(`🏆 Game wins: ${personal.wins}`);
+    if (personal.pisses > 0) lines.push(`🚽 ${personal.pisses} pisses`);
     if (myBadgeGroups.length > 0) {
       const top = myBadgeGroups.slice(0, 3).map((g) => {
         const x = g.entries.length > 1 ? ` ×${g.entries.length}` : "";
@@ -411,7 +433,7 @@ function RecapPageInner() {
     );
   }
 
-  const isEmpty = windowedDrinks.length === 0;
+  const isEmpty = windowedDrinks.length === 0 && windowedPisses.length === 0;
 
   const userById = new Map(users.map((u) => [u.id, u]));
   const myBadgesByTier = {
@@ -494,6 +516,7 @@ function RecapPageInner() {
                 sub={`${personal.votes.proposalsWon} won · ${personal.votes.proposalsLost} lost`}
               />
               <StatRow label="Game wins" value={`${personal.wins}`} />
+              <StatRow label="Pisses" value={`${personal.pisses}`} />
             </ul>
           )}
         </Card>
@@ -609,6 +632,12 @@ function RecapPageInner() {
                 label="Game champion"
                 user={superlatives.champion?.user}
                 value={superlatives.champion ? `${superlatives.champion.value} W` : "—"}
+              />
+              <SuperRow
+                icon="🚽"
+                label="Most pisses"
+                user={superlatives.mostPisses?.user}
+                value={superlatives.mostPisses ? `${superlatives.mostPisses.value}` : "—"}
               />
             </ul>
           )}

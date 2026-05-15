@@ -8,6 +8,7 @@ import type {
   GameTotalsRow,
   ItineraryEventRow,
   ItineraryReactionRow,
+  PissEntryRow,
   SpinRow,
   UserRow,
   VoteItemRow,
@@ -39,6 +40,7 @@ export type EarnedBadge = Achievement & {
 export type AchievementCtx = {
   users: UserRow[];
   drinks: DrinkRow[];
+  pisses: PissEntryRow[];
   voteItems: VoteItemRow[];
   voteResponses: VoteResponseRow[];
   voteTally: VoteTallyRow[];
@@ -152,6 +154,16 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "iron-man", title: "Iron Man", blurb: "Centurion + Iron Liver + Dynasty.", icon: "🦾", tier: "win", timing: "endOfDay" },
   { id: "ice-cold", title: "Ice Cold", blurb: "Sober but still won a game.", icon: "🧊", tier: "win", timing: "endOfDay" },
   { id: "no-show", title: "No Show", blurb: "Crickets all night.", icon: "🫥", tier: "fail", timing: "endOfDay" },
+
+  // Pisses — live
+  { id: "broke-the-seal", title: "Broke the Seal", blurb: "First piss of the night.", icon: "🚽", tier: "fun", timing: "live" },
+  { id: "garden-hose", title: "Garden Hose", blurb: "5+ pisses in one night.", icon: "🌱", tier: "fun", timing: "live" },
+  { id: "floodgates", title: "Floodgates", blurb: "10+ pisses in one night.", icon: "🌊", tier: "win", timing: "live" },
+  { id: "pissing-match", title: "Pissing Match", blurb: "Logged a piss within 2 min of another buck.", icon: "🤼", tier: "fun", timing: "live" },
+  { id: "bladder-buster", title: "Bladder Buster", blurb: "20+ pisses in one night.", icon: "🏆", tier: "win", timing: "live" },
+  // Pisses — end-of-day
+  { id: "niagara", title: "Niagara", blurb: "Most pisses of the night.", icon: "💦", tier: "win", timing: "endOfDay" },
+  { id: "iron-bladder", title: "Iron Bladder", blurb: "5+ drinks and zero pisses.", icon: "🧱", tier: "fun", timing: "endOfDay" },
 ];
 
 const byId = new Map(ACHIEVEMENTS.map((a) => [a.id, a]));
@@ -858,6 +870,7 @@ export function earnedForUser(
       if (
         presentForWindow &&
         !flags.drank &&
+        !flags.pissed &&
         !flags.voted &&
         !flags.played &&
         !flags.photographed &&
@@ -866,6 +879,57 @@ export function earnedForUser(
       ) {
         out.push(make("no-show", userId, undefined, undefined, ctx.windowEndMs));
       }
+    }
+  }
+
+  // ── PISSES ─────────────────────────────────────────────────────────────
+  const userPisses = ctx.pisses.filter((p) => p.user_id === userId);
+  const sortedPissTimes = userPisses
+    .map((p) => new Date(p.logged_at).getTime())
+    .sort((a, b) => a - b);
+
+  if (wantLive) {
+    if (sortedPissTimes.length > 0) {
+      const partyEarliest = Math.min(
+        ...ctx.pisses.map((p) => new Date(p.logged_at).getTime()),
+      );
+      if (sortedPissTimes[0] === partyEarliest) {
+        out.push(make("broke-the-seal", userId, undefined, undefined, sortedPissTimes[0]));
+      }
+    }
+    if (sortedPissTimes.length >= 5) {
+      out.push(make("garden-hose", userId, `${sortedPissTimes.length} pisses`, undefined, sortedPissTimes[4]));
+    }
+    if (sortedPissTimes.length >= 10) {
+      out.push(make("floodgates", userId, `${sortedPissTimes.length} pisses`, undefined, sortedPissTimes[9]));
+    }
+    if (sortedPissTimes.length >= 20) {
+      out.push(make("bladder-buster", userId, `${sortedPissTimes.length} pisses`, undefined, sortedPissTimes[19]));
+    }
+    for (const p of userPisses) {
+      const t = new Date(p.logged_at).getTime();
+      const partner = ctx.pisses.find(
+        (o) => o.user_id !== userId && Math.abs(new Date(o.logged_at).getTime() - t) <= 120_000,
+      );
+      if (partner) {
+        out.push(make("pissing-match", userId, undefined, p.id, t));
+        break;
+      }
+    }
+  }
+
+  if (wantEnd) {
+    const countsByUser = new Map<string, number>();
+    for (const p of ctx.pisses) {
+      countsByUser.set(p.user_id, (countsByUser.get(p.user_id) ?? 0) + 1);
+    }
+    const max = Math.max(0, ...countsByUser.values());
+    if (max > 0 && (countsByUser.get(userId) ?? 0) === max) {
+      const lastPissTime = sortedPissTimes.at(-1);
+      out.push(make("niagara", userId, `${max} pisses`, undefined, lastPissTime));
+    }
+    if (drinkCount >= 5 && sortedPissTimes.length === 0) {
+      out.push(make("iron-bladder", userId, `${drinkCount} drinks, 0 pisses`, undefined, endOfPartyMs));
     }
   }
 
@@ -889,6 +953,7 @@ function lastUserActivityMs(ctx: AchievementCtx, userId: string): number | null 
     if (Number.isFinite(t) && t > max) max = t;
   };
   for (const d of ctx.drinks) if (d.user_id === userId) consider(d.logged_at);
+  for (const p of ctx.pisses) if (p.user_id === userId) consider(p.logged_at);
   for (const r of ctx.voteResponses) if (r.user_id === userId) consider(r.updated_at);
   for (const i of ctx.voteItems) if (i.proposer_id === userId) consider(i.created_at);
   for (const s of ctx.gameScores) if (s.user_id === userId) consider(s.recorded_at);
@@ -904,6 +969,7 @@ function lastUserActivityMs(ctx: AchievementCtx, userId: string): number | null 
 
 type ActivityFlags = {
   drank: boolean;
+  pissed: boolean;
   voted: boolean;
   played: boolean;
   photographed: boolean;
@@ -914,6 +980,7 @@ type ActivityFlags = {
 
 function activityFlags(ctx: AchievementCtx, userId: string): ActivityFlags {
   const drank = ctx.drinks.some((d) => d.user_id === userId);
+  const pissed = ctx.pisses.some((p) => p.user_id === userId);
   const voted =
     ctx.voteResponses.some((r) => r.user_id === userId) ||
     ctx.voteItems.some((i) => i.proposer_id === userId);
@@ -925,6 +992,7 @@ function activityFlags(ctx: AchievementCtx, userId: string): ActivityFlags {
   );
   return {
     drank,
+    pissed,
     voted,
     played,
     photographed,

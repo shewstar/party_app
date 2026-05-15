@@ -16,6 +16,7 @@ import { useBattery } from "./battery";
 type TableName =
   | "users"
   | "drink_entries"
+  | "piss_entries"
   | "vote_items"
   | "vote_responses"
   | "games"
@@ -40,6 +41,7 @@ const VIEW_DEPENDENCIES: Record<string, TableName[]> = {
 const ALL_TABLES: TableName[] = [
   "users",
   "drink_entries",
+  "piss_entries",
   "vote_items",
   "vote_responses",
   "games",

@@ -14,6 +14,7 @@ import type {
   GameScoreRow,
   GameTotalsRow,
   ItineraryEventRow,
+  PissEntryRow,
   SpinRow,
   UserRow,
   VoteTallyRow,
@@ -25,6 +26,7 @@ export default function TimelinePage() {
   const [mode, setMode] = useState<"all" | "mine">("all");
   const { data: allUsers } = useTableData<UserRow>("users");
   const { data: allDrinks } = useTableData<DrinkRow>("drink_entries");
+  const { data: allPisses } = useTableData<PissEntryRow>("piss_entries");
   const { data: allVotes } = useTableData<VoteTallyRow>("v_vote_tally");
   const { data: allGames } = useTableData<GameRow>("games");
   const { data: allGameTotals } = useTableData<GameTotalsRow>("v_game_totals");
@@ -43,6 +45,7 @@ export default function TimelinePage() {
       buildTimelineEvents({
         users: allUsers ?? [],
         drinks: allDrinks ?? [],
+        pisses: allPisses ?? [],
         votes: allVotes ?? [],
         games: allGames ?? [],
         gameTotals: allGameTotals ?? [],
@@ -53,6 +56,7 @@ export default function TimelinePage() {
     [
       allUsers,
       allDrinks,
+      allPisses,
       allVotes,
       allGames,
       allGameTotals,
