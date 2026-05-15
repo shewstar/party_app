@@ -124,6 +124,11 @@ export default function HomePage() {
     [allDrinks, user],
   );
 
+  const todaysDrinks = useMemo(
+    () => myDrinks.filter((d) => partyDayKey(d.logged_at) === todayKey),
+    [myDrinks, todayKey],
+  );
+
   const board = useMemo(
     () => [...(leaderboard as DrinksLeaderboardRow[])]
       .sort((a, b) => b.drink_count - a.drink_count)
@@ -227,7 +232,7 @@ export default function HomePage() {
             <SkeletonLine width="w-24" height="h-5" />
           </div>
         </div>
-        <SkeletonCard rows={2} className="grid grid-cols-2 gap-4" />
+        <SkeletonCard rows={2} className="grid grid-cols-3 gap-4" />
         <div className="bg-surface border border-line rounded-card py-7" />
         <SkeletonCard rows={1} />
         <div className="grid grid-cols-2 gap-3">
@@ -260,9 +265,19 @@ export default function HomePage() {
       </header>
 
       <Card>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div>
-            <div className="text-xs uppercase tracking-wide text-muted">Drinks</div>
+            <div className="text-xs uppercase tracking-wide text-muted">Today</div>
+            <div className="text-3xl font-bold tabular-nums">{todaysDrinks.length}</div>
+            <div className="text-xs text-muted">
+              {todaysDrinks
+                .reduce((s, d) => s + Number(d.standard_drinks), 0)
+                .toFixed(1)}{" "}
+              std
+            </div>
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted">Total</div>
             <div className="text-3xl font-bold tabular-nums">{myDrinks.length}</div>
             <div className="text-xs text-muted">
               {myDrinks
