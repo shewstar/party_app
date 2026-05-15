@@ -29,6 +29,7 @@ import type {
   GameTotalsRow,
   ItineraryEventRow,
   ItineraryReactionRow,
+  PissEntryRow,
   SpinRow,
   UserRow,
   VoteItemRow,
@@ -81,6 +82,7 @@ function playAchievementChime() {
 type RawSources = {
   users: UserRow[];
   drinks: DrinkRow[];
+  pisses: PissEntryRow[];
   voteItems: VoteItemRow[];
   voteResponses: VoteResponseRow[];
   voteTally: VoteTallyRow[];
@@ -111,6 +113,7 @@ function buildCtxForDay(raw: RawSources, dayKey: string): AchievementCtx {
   return {
     users: raw.users,
     drinks: raw.drinks.filter((d) => inWindow(d.logged_at)),
+    pisses: raw.pisses.filter((p) => inWindow(p.logged_at)),
     voteItems: raw.voteItems.filter((i) => inWindow(i.created_at)),
     voteResponses: raw.voteResponses.filter((r) =>
       raw.voteItems.some((i) => i.id === r.vote_item_id && inWindow(i.created_at)),
@@ -139,6 +142,7 @@ export function AchievementsProvider({ children }: { children: ReactNode }) {
   const ready = useRealtimeReady();
   const { data: _users } = useTableData<UserRow>("users");
   const { data: _drinks } = useTableData<DrinkRow>("drink_entries");
+  const { data: _pisses } = useTableData<PissEntryRow>("piss_entries");
   const { data: _voteItems } = useTableData<VoteItemRow>("vote_items");
   const { data: _voteResponses } = useTableData<VoteResponseRow>("vote_responses");
   const { data: _voteTally } = useTableData<VoteTallyRow>("v_vote_tally");
@@ -166,6 +170,7 @@ export function AchievementsProvider({ children }: { children: ReactNode }) {
     () => ({
       users: _users as UserRow[],
       drinks: _drinks as DrinkRow[],
+      pisses: _pisses as PissEntryRow[],
       voteItems: _voteItems as VoteItemRow[],
       voteResponses: _voteResponses as VoteResponseRow[],
       voteTally: _voteTally as VoteTallyRow[],
@@ -180,7 +185,7 @@ export function AchievementsProvider({ children }: { children: ReactNode }) {
       appOpens: _appOpens as AppOpenRow[],
     }),
     [
-      _users, _drinks, _voteItems, _voteResponses, _voteTally,
+      _users, _drinks, _pisses, _voteItems, _voteResponses, _voteTally,
       _games, _gamePlayers, _gameScores, _gameTotals,
       _spins, _photos, _itineraryEvents, _itineraryReactions, _appOpens,
     ],

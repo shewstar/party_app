@@ -52,6 +52,7 @@ function emptyCtx(users: UserRow[], drinks: DrinkRow[] = []): AchievementCtx {
   return {
     users,
     drinks,
+    pisses: [],
     voteItems: [],
     voteResponses: [],
     voteTally: [],

@@ -2,6 +2,7 @@
 
 import { memo, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import BigButton from "@/components/BigButton";
 import Card from "@/components/Card";
 import Tile from "@/components/Tile";
@@ -9,6 +10,7 @@ import Avatar from "@/components/Avatar";
 import BACBadge from "@/components/BACBadge";
 import DisclaimerFooter from "@/components/DisclaimerFooter";
 import StatusPills from "@/components/StatusPills";
+import LogLiquidSheet from "@/components/LogLiquidSheet";
 import { SkeletonAvatar, SkeletonCard, SkeletonLine, SkeletonTile } from "@/components/Skeleton";
 import { estimateBAC } from "@/lib/bac";
 import { useUser } from "@/lib/user-context";
@@ -16,6 +18,9 @@ import { useTableData } from "@/lib/realtime-provider";
 import { partyDayKey } from "@/lib/recap";
 import { vkey } from "@/lib/storage";
 import { buildTimelineEvents, formatTimeAgo } from "@/lib/timeline-events";
+import { supabase } from "@/lib/supabase/browser";
+import { useHaptic } from "@/lib/haptics";
+import { useOnlineStatus } from "@/lib/offline-queue";
 import type {
   DrinkRow,
   DrinksLeaderboardRow,
@@ -23,6 +28,7 @@ import type {
   GameScoreRow,
   GameTotalsRow,
   ItineraryEventRow,
+  PissEntryRow,
   SpinRow,
   UserRow,
   VoteItemRow,
@@ -69,8 +75,14 @@ function timeSince(iso: string | null): string {
 
 export default function HomePage() {
   const { user, loading } = useUser();
+  const router = useRouter();
+  const haptic = useHaptic();
+  const { online, enqueue } = useOnlineStatus();
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [pissPending, setPissPending] = useState(false);
 
   const { data: allDrinks } = useTableData<DrinkRow>("drink_entries");
+  const { data: allPisses } = useTableData<PissEntryRow>("piss_entries");
   const { data: leaderboard } = useTableData<DrinksLeaderboardRow>("v_drinks_leaderboard");
   const { data: tally } = useTableData<VoteTallyRow>("v_vote_tally");
   const { data: allVoteItems } = useTableData<VoteItemRow>("vote_items");
@@ -172,6 +184,7 @@ export default function HomePage() {
     const events = buildTimelineEvents({
       users: (allUsers as UserRow[]) ?? [],
       drinks: (allDrinks as DrinkRow[]) ?? [],
+      pisses: (allPisses as PissEntryRow[]) ?? [],
       votes: (tally as VoteTallyRow[]) ?? [],
       games: (allGames as GameRow[]) ?? [],
       gameTotals: (allGameTotals as GameTotalsRow[]) ?? [],
@@ -180,7 +193,29 @@ export default function HomePage() {
       itinerary: (allItinerary as ItineraryEventRow[]) ?? [],
     });
     return events[0] ?? null;
-  }, [allUsers, allDrinks, tally, allGames, allGameTotals, allGameScores, allSpins, allItinerary]);
+  }, [allUsers, allDrinks, allPisses, tally, allGames, allGameTotals, allGameScores, allSpins, allItinerary]);
+
+  async function handleLogPiss() {
+    if (!user || pissPending) return;
+    setPissPending(true);
+    try {
+      if (!online) {
+        enqueue("piss_entries", { user_id: user.id });
+      } else {
+        const { error } = await supabase()
+          .from("piss_entries")
+          .insert({ user_id: user.id });
+        if (error) {
+          alert(error.message);
+          return;
+        }
+      }
+      haptic.success();
+      setSheetOpen(false);
+    } finally {
+      setPissPending(false);
+    }
+  }
 
   if (loading || !user) {
     return (
@@ -290,9 +325,21 @@ export default function HomePage() {
         <span className="text-muted text-sm">→</span>
       </Link>
 
-      <BigButton href="/drink" className="py-7 text-2xl">
-        ➕ Add a Drink
+      <BigButton onClick={() => setSheetOpen(true)} className="py-7 text-2xl">
+        💧 Log a Liquid
       </BigButton>
+
+      {sheetOpen && (
+        <LogLiquidSheet
+          onClose={() => setSheetOpen(false)}
+          onAddDrink={() => {
+            setSheetOpen(false);
+            router.push("/drink");
+          }}
+          onLogPiss={handleLogPiss}
+          pissPending={pissPending}
+        />
+      )}
 
       {buckUser && (
         <Card>
